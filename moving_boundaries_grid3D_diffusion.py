@@ -1,3 +1,45 @@
+#+====================================================================+
+#| Author: Carlos Borau, University of Zaragoza [cborau@unizar.es]    |
+#| Version: 1.00                                                      |
+#| Last update: 2022-06-14                                            |
+#+====================================================================+
+#+--------------------------------------------------------------------+
+#| This code aims to simulate the cellular microenvironment incluing: |
+#|                                                                    |
+#|    ----------------------------------------------------------------|
+#|    | Boundary conditions                                           |
+#|    ----------------------------------------------------------------|
+#|        - mechanical:                                               |
+#|              . restricted movement                                 |
+#|              . free movement                                       |
+#|              . imposed displacements (linear, oscilatory)          |
+#|              . sticky                                              |
+#|              . parallel sliding                                    |
+#|                                                                    |
+#|        - chemical:                                                 |
+#|              . initial concentration                               |
+#|              . fixed concentration                                 |
+#|                                                                    |
+#|    ----------------------------------------------------------------|
+#|    | Agents                                                        |
+#|    ----------------------------------------------------------------|
+#|        - corner agents: visual purpose to show the domain limits   |
+#|                                                                    |
+#|        - ECM agents: agents representing the extracelluar matrix   |
+#|                                                                    |
+#|              . mechanical relationship: dumped system              |
+#|                                                                    |
+#|                       +---|D|---+                                  |
+#|                 a1 ---|         |--- a2                            |
+#|                       +-/\/K\/\-+                                  |
+#|                                                                    |
+#|              . interchange of substances:                          |
+#|                                                                    |
+#|                 a1 <--|diffusion|--> a2                            |
+#|                                                                    |
+#+--------------------------------------------------------------------+
+#+====================================================================+
+
 from pyflamegpu import *
 import sys, random, math
 import seaborn as sns
@@ -10,51 +52,45 @@ from dataclasses import make_dataclass
 import time
 
 sns.set()
-
 start_time = time.time()
+
+#+====================================================================+
+#| GLOBAL PARAMETERS                                                  |
+#+====================================================================+
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
 ENSEMBLE = False;
 ENSEMBLE_RUNS = 0;
+VISUALISATION = True; # Change to false if pyflamegpu has not been built with visualisation support
+DEBUG_PRINTING = False;
+PAUSE_EVERY_STEP = False;
+SAVE_DATA_TO_FILE = False; # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_EVERY_N_STEPS = 2;   # Affects both the .vtk files and the Dataframes storing boundary data
+CURR_PATH = pathlib.Path().absolute();
+RES_PATH = CURR_PATH / 'result_files';
+RES_PATH.mkdir(parents=True, exist_ok=True);
+print("Executing in ", CURR_PATH);
+MAX_SEARCH_RADIUS = 2.0; # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
+EPSILON = 0.0000000001;
+
+# Number of agents per direction (x,y,z)
+#+--------------------------------------------------------------------+
 N = 10;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
-# Change to false if pyflamegpu has not been built with visualisation support
-VISUALISATION = True;
-DEBUG_PRINTING = False;
-PAUSE_EVERY_STEP = False;
-SAVE_DATA_TO_FILE = True;
-SAVE_EVERY_N_STEPS = 2;
-OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 
-# Interaction and mechanical parameters
+# Time simulation parameters
+#+--------------------------------------------------------------------+
 TIME_STEP = 0.012; # seconds
-STEPS = 100;
+STEPS = 50;
+
+# Boundray interactions and mechanical parameters
+#+--------------------------------------------------------------------+
+ECM_K_ELAST = 1.0;  #[N/units/kg]
+ECM_D_DUMPING = 0.1; #[N*s/units/kg]
+ECM_MASS = 1.0; #[dimensionless to make K and D mass dependent]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.1, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
-OSCILLATORY_AMPLITUDE = 0.25; # range [0-1]
-OSCILLATORY_FREQ = 0.1; # strain oscillation frequency [s^-1]
-OSCILLATORY_W = 2 * math.pi * OSCILLATORY_FREQ * TIME_STEP; 
-
-DIFFUSION_COEFF = 0.15; # diffusion coefficient in [units]??
-BOUNDARY_CONC_INIT = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]; # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units??]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-BOUNDARY_CONC_FIXED = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]; # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
-
-# Check diffusion values for numerical stability
-dxdydz = 1.0 / (N - 1)
-Fi = 3 * (DIFFUSION_COEFF * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
-print('Fi value: {0}'.format(Fi))
-if Fi > 0.5:
-    print('ERROR: diffusion problem is ill conditioned, check values and consider decreasing time step')
-    exit()
-    
-
-# Parallel disp rate values are overrun in oscillatory assays
-if OSCILLATORY_SHEAR_ASSAY:
-    for d in range(12):
-       if abs(BOUNDARY_DISP_RATES_PARALLEL[d]) > 0.0:
-           BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * 0.0) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*w is used because the slope of the sin(w*t) function is needed. Expressed in units/sec
-
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -72,32 +108,42 @@ print("ECM_ECM_EQUILIBRIUM_DISTANCE: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
+OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
+OSCILLATORY_AMPLITUDE = 0.25; # range [0-1]
+OSCILLATORY_FREQ = 0.1; # strain oscillation frequency [s^-1]
+OSCILLATORY_W = 2 * math.pi * OSCILLATORY_FREQ * TIME_STEP; 
 
-ECM_K_ELAST = 1.0;
-ECM_D_DUMPING = 0.1;
-ECM_MASS = 1.0;
+# Parallel disp rate values are overrun in oscillatory assays
+#+--------------------------------------------------------------------+
+if OSCILLATORY_SHEAR_ASSAY:
+    for d in range(12):
+       if abs(BOUNDARY_DISP_RATES_PARALLEL[d]) > 0.0:
+           BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * 0.0) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*w is used because the slope of the sin(w*t) function is needed. Expressed in units/sec
 
 
-#MAX_SEARCH_RADIUS = max([ECM_ECM_INTERACTION_RADIUS, ECM_BOUNDARY_INTERACTION_RADIUS]);
-MAX_SEARCH_RADIUS = 2.0; # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-EPSILON = 0.0000000001;
-
-CURR_PATH = pathlib.Path().absolute();
-RES_PATH = CURR_PATH / 'result_files';
-RES_PATH.mkdir(parents=True, exist_ok=True);
-print("Executing in ", CURR_PATH)
+# Diffusion related paramenters
+#+--------------------------------------------------------------------+
+DIFFUSION_COEFF = 0.15; # diffusion coefficient in [units^2/s]
+BOUNDARY_CONC_INIT = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]; # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]; # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
+#+--------------------------------------------------------------------+
 MAX_EXPECTED_BOUNDARY_POS = max(BOUNDARY_DISP_RATES) * STEPS * TIME_STEP + 1.0;
 MIN_EXPECTED_BOUNDARY_POS = min(BOUNDARY_DISP_RATES) * STEPS * TIME_STEP - 1.0;
+print("Max expected boundary position: ", MAX_EXPECTED_BOUNDARY_POS);
+print("Min expected boundary position: ", MIN_EXPECTED_BOUNDARY_POS);
 
+# Dataframe initialization data storage
+#+--------------------------------------------------------------------+
 BPOS = make_dataclass("BPOS", [("xpos", float), ("xneg", float), ("ypos", float), ("yneg", float), ("zpos", float), ("zneg", float)])
 # Use a dataframe to store boundary positions over time
 BPOS_OVER_TIME = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
 OSOT = make_dataclass("OSOT", [("strain", float)])
 OSCILLATORY_STRAIN_OVER_TIME =  pd.DataFrame([OSOT(0)])
 
-# Some checkings
+# Checking for incompatible conditions
+#+--------------------------------------------------------------------+
 critical_error = False
 msg_poisson = "WARNING: poisson ratio directions are not well defined or might not have sense due to boundary conditions \n"
 if (BOUNDARY_DISP_RATES[0] != 0.0 or BOUNDARY_DISP_RATES[1] != 0.0) and POISSON_DIRS[1] != 0:
@@ -112,18 +158,27 @@ for i in range(6):
     if CLAMP_AGENT_TOUCHING_BOUNDARY[i] > 0 and ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i] > 0:
         print(msg_incompatible_conditions.format(i))
         critical_error = True
+        
+# Check diffusion values for numerical stability
+dxdydz = 1.0 / (N - 1)
+Fi = 3 * (DIFFUSION_COEFF * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
+print('Fi value: {0}'.format(Fi))
+if Fi > 0.5:
+    print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
+    critical_error = True
 
 if critical_error:
     quit()
 
-print("Max expected boundary position: ", MAX_EXPECTED_BOUNDARY_POS);
-print("Min expected boundary position: ", MIN_EXPECTED_BOUNDARY_POS);
 
+
+#+====================================================================+
+#| FLAMEGPU2 IMPLEMENTATION                                           |
+#+====================================================================+
 
 """
   FLAME GPU 2 implementation of mechanical assays via moving boundaries and extracellular matrix (ecm) agents by using spatial3D messaging.
 """
-
 
 bcorner_output_location_data_file = "bcorner_output_location_data.cpp";
 bcorner_move_file = "bcorner_move.cpp";
@@ -509,9 +564,10 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
          if PAUSE_EVERY_STEP:
              input() # pause everystep
 
-         if OSCILLATORY_SHEAR_ASSAY:            
-             new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
-             OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
+         if OSCILLATORY_SHEAR_ASSAY:   
+             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
+                OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
              for d in range(12):
                 if self.apply_parallel_disp[d]:
                     BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * stepCounter) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*t is used because the slope of the sin(w*t) function is needed
@@ -559,7 +615,7 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
             
             bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
             FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
-            if (stepCounter > 0):
+            if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 print ("====== MOVING BOUNDARIES DUE TO CONDITIONS ======")                 
                 print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
                 print ("=================================================")
@@ -589,8 +645,9 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
          #   print ("=================================================")
          
          if boundaries_moved:
-             new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
-             BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
+            if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
+                BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
 
 
 
@@ -1102,46 +1159,47 @@ else:
     incL_dir2 = (BPOS_OVER_TIME.iloc[:,POISSON_DIRS[1]*2] - BPOS_OVER_TIME.iloc[:,POISSON_DIRS[1]*2 + 1]) - (BPOS_OVER_TIME.iloc[0,POISSON_DIRS[1]*2] -  BPOS_OVER_TIME.iloc[0,POISSON_DIRS[1]*2 + 1])
 
     print(incL_dir1)
-    print('bla')
+    print('/')
     print(incL_dir2)
         
     POISSON_RATIO_OVER_TIME = -1 * incL_dir1 / incL_dir2
 
     counter = 0;
-    for step in steps:
+    for step in steps:        
         stepcount = step.getStepCount();
-        ecm_agents = step.getAgent("ECM");
-        ecm_agent_counts[counter] = ecm_agents.getCount();
-        f_bx_pos = ecm_agents.getSumFloat("f_bx_pos")
-        f_bx_neg = ecm_agents.getSumFloat("f_bx_neg")
-        f_by_pos = ecm_agents.getSumFloat("f_by_pos")
-        f_by_neg = ecm_agents.getSumFloat("f_by_neg")
-        f_bz_pos = ecm_agents.getSumFloat("f_bz_pos")
-        f_bz_neg = ecm_agents.getSumFloat("f_bz_neg")
-        f_bx_pos_y = ecm_agents.getSumFloat("f_bx_pos_y")
-        f_bx_pos_z = ecm_agents.getSumFloat("f_bx_pos_z")
-        f_bx_neg_y = ecm_agents.getSumFloat("f_bx_neg_y")
-        f_bx_neg_z = ecm_agents.getSumFloat("f_bx_neg_z")
-        f_by_pos_x = ecm_agents.getSumFloat("f_by_pos_x")
-        f_by_pos_z = ecm_agents.getSumFloat("f_by_pos_z")
-        f_by_neg_x = ecm_agents.getSumFloat("f_by_neg_x")
-        f_by_neg_z = ecm_agents.getSumFloat("f_by_neg_z")
-        f_bz_pos_x = ecm_agents.getSumFloat("f_bz_pos_x")
-        f_bz_pos_y = ecm_agents.getSumFloat("f_bz_pos_y")
-        f_bz_neg_x = ecm_agents.getSumFloat("f_bz_neg_x")
-        f_bz_neg_y = ecm_agents.getSumFloat("f_bz_neg_y")
+        if stepcount % SAVE_EVERY_N_STEPS == 0 or stepcount == 1:
+            ecm_agents = step.getAgent("ECM");
+            ecm_agent_counts[counter] = ecm_agents.getCount();
+            f_bx_pos = ecm_agents.getSumFloat("f_bx_pos")
+            f_bx_neg = ecm_agents.getSumFloat("f_bx_neg")
+            f_by_pos = ecm_agents.getSumFloat("f_by_pos")
+            f_by_neg = ecm_agents.getSumFloat("f_by_neg")
+            f_bz_pos = ecm_agents.getSumFloat("f_bz_pos")
+            f_bz_neg = ecm_agents.getSumFloat("f_bz_neg")
+            f_bx_pos_y = ecm_agents.getSumFloat("f_bx_pos_y")
+            f_bx_pos_z = ecm_agents.getSumFloat("f_bx_pos_z")
+            f_bx_neg_y = ecm_agents.getSumFloat("f_bx_neg_y")
+            f_bx_neg_z = ecm_agents.getSumFloat("f_bx_neg_z")
+            f_by_pos_x = ecm_agents.getSumFloat("f_by_pos_x")
+            f_by_pos_z = ecm_agents.getSumFloat("f_by_pos_z")
+            f_by_neg_x = ecm_agents.getSumFloat("f_by_neg_x")
+            f_by_neg_z = ecm_agents.getSumFloat("f_by_neg_z")
+            f_bz_pos_x = ecm_agents.getSumFloat("f_bz_pos_x")
+            f_bz_pos_y = ecm_agents.getSumFloat("f_bz_pos_y")
+            f_bz_neg_x = ecm_agents.getSumFloat("f_bz_neg_x")
+            f_bz_neg_y = ecm_agents.getSumFloat("f_bz_neg_y")
 
-        step_bforce = pd.DataFrame([BFORCE(f_bx_pos, f_bx_neg, f_by_pos, f_by_neg, f_bz_pos, f_bz_neg)])
-        step_bforce_shear = pd.DataFrame([BFORCE_SHEAR(f_bx_pos_y, f_bx_pos_z,f_bx_neg_y,f_bx_neg_z,
-                                                       f_by_pos_x, f_by_pos_z,f_by_neg_x,f_by_neg_z,
-                                                       f_bz_pos_x, f_bz_pos_y,f_bz_neg_x,f_bz_neg_y)])
-        if counter == 0:
-            BFORCE_OVER_TIME = pd.DataFrame([BFORCE(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
-            BFORCE_SHEAR_OVER_TIME = pd.DataFrame([BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
-        else:
-            BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True)
-            BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True)
-        counter+=1;
+            step_bforce = pd.DataFrame([BFORCE(f_bx_pos, f_bx_neg, f_by_pos, f_by_neg, f_bz_pos, f_bz_neg)])
+            step_bforce_shear = pd.DataFrame([BFORCE_SHEAR(f_bx_pos_y, f_bx_pos_z,f_bx_neg_y,f_bx_neg_z,
+                                                           f_by_pos_x, f_by_pos_z,f_by_neg_x,f_by_neg_z,
+                                                           f_bz_pos_x, f_bz_pos_y,f_bz_neg_x,f_bz_neg_y)])
+            if counter == 0:
+                BFORCE_OVER_TIME = pd.DataFrame([BFORCE(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
+                BFORCE_SHEAR_OVER_TIME = pd.DataFrame([BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
+            else:
+                BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True)
+                BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True)
+            counter+=1;
     print()
     print("============================")
     print("BOUNDARY POSITIONS OVER TIME")

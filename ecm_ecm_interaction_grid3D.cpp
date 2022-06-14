@@ -242,7 +242,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MsgArray3D, flamegpu::Msg
   if (threadIdx.x%2 == 0) {
     //printf("Array3D for agent %d read %d messages!\n", id, ct);
   }
-  printf("Array3D for agent %d read %d messages! grid [%d %d %d], pos (%2.6f , %2.6f, %2.6f) \n", id, ct, agent_grid_i, agent_grid_j, agent_grid_k, agent_x, agent_y, agent_z);
+  //printf("Array3D for agent %d read %d messages! grid [%d %d %d], pos (%2.6f , %2.6f, %2.6f) \n", id, ct, agent_grid_i, agent_grid_j, agent_grid_k, agent_x, agent_y, agent_z);
 
   //Apply diffusion equation
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
@@ -254,13 +254,16 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MsgArray3D, flamegpu::Msg
   float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);
   float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
   float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
-  printf("DIFFUSION for agent %d , [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, dx, dy, dz, Fx, Fy, Fz);
   agent_conc = agent_conc_prev + Fx * (n_left_conc - (2 * agent_conc_prev) + n_right_conc) + Fy * (n_front_conc - (2 * agent_conc_prev) + n_back_conc) + Fz * (n_up_conc - (2 * agent_conc_prev) + n_down_conc) + R * DELTA_TIME;
   
-  printf("agent %d: left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc, n_right_conc);
-  printf("agent %d: front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc, n_back_conc);
-  printf("agent %d: up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc, n_down_conc);
-  printf("agent %d: conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev, agent_conc);
+  if (DEBUG_PRINTING == 1){
+	printf("DIFFUSION for agent %d , [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, dx, dy, dz, Fx, Fy, Fz);
+	printf("agent %d: left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc, n_right_conc);
+    printf("agent %d: front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc, n_back_conc);
+    printf("agent %d: up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc, n_down_conc);
+    printf("agent %d: conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev, agent_conc);  
+  }
+  
 
   FLAMEGPU->setVariable<float>("fx", agent_fx);
   FLAMEGPU->setVariable<float>("fy", agent_fy);
