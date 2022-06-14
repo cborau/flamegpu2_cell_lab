@@ -60,16 +60,16 @@ start_time = time.time()
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
 ENSEMBLE = False;
 ENSEMBLE_RUNS = 0;
-VISUALISATION = True; # Change to false if pyflamegpu has not been built with visualisation support
+VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;
-SAVE_DATA_TO_FILE = False; # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 2;   # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_DATA_TO_FILE = False;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
 print("Executing in ", CURR_PATH);
-MAX_SEARCH_RADIUS = 2.0; # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
+MAX_SEARCH_RADIUS = 2.0;      # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
 EPSILON = 0.0000000001;
 
 # Number of agents per direction (x,y,z)
@@ -85,9 +85,9 @@ STEPS = 50;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 1.0;  #[N/units/kg]
-ECM_D_DUMPING = 0.1; #[N*s/units/kg]
-ECM_MASS = 1.0; #[dimensionless to make K and D mass dependent]
+ECM_K_ELAST = 1.0;       #[N/units/kg]
+ECM_D_DUMPING = 0.1;     #[N*s/units/kg]
+ECM_MASS = 1.0;          #[dimensionless to make K and D mass dependent]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.1, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
@@ -100,7 +100,7 @@ BOUNDARY_DUMPING_VALUE = 0.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
-ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
+ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 #ECM_ECM_INTERACTION_RADIUS = 100;
 #ECM_ECM_EQUILIBRIUM_DISTANCE = 0.45;
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1])  / (N - 1);
@@ -109,8 +109,8 @@ ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
 OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
-OSCILLATORY_AMPLITUDE = 0.25; # range [0-1]
-OSCILLATORY_FREQ = 0.1; # strain oscillation frequency [s^-1]
+OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
+OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
 OSCILLATORY_W = 2 * math.pi * OSCILLATORY_FREQ * TIME_STEP; 
 
 # Parallel disp rate values are overrun in oscillatory assays
@@ -123,9 +123,17 @@ if OSCILLATORY_SHEAR_ASSAY:
 
 # Diffusion related paramenters
 #+--------------------------------------------------------------------+
-DIFFUSION_COEFF = 0.15; # diffusion coefficient in [units^2/s]
-BOUNDARY_CONC_INIT = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]; # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+DIFFUSION_COEFF = 0.15;                                     # diffusion coefficient in [units^2/s]
+BOUNDARY_CONC_INIT = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0];  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
 BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]; # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+
+N_SPECIES = 2; # number of diffusing species
+DIFFUSION_COEFF_MULTI = [0.15,0.2]                                 # diffusion coefficient in [units^2/s] per specie
+BOUNDARY_CONC_INIT_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+                            [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]]  # add as many lines as different species
+                            
+BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+                             [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -158,7 +166,10 @@ for i in range(6):
     if CLAMP_AGENT_TOUCHING_BOUNDARY[i] > 0 and ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i] > 0:
         print(msg_incompatible_conditions.format(i))
         critical_error = True
-        
+
+if (len(DIFFUSION_COEFF_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_INIT_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_FIXED_MULTI) != N_SPECIES):  
+    print('ERROR: you must define a diffusion coefficient and the boundary conditions for each species simulated') 
+    critical_error = True
 # Check diffusion values for numerical stability
 dxdydz = 1.0 / (N - 1)
 Fi = 3 * (DIFFUSION_COEFF * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
@@ -166,10 +177,10 @@ print('Fi value: {0}'.format(Fi))
 if Fi > 0.5:
     print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
     critical_error = True
+    
 
 if critical_error:
     quit()
-
 
 
 #+====================================================================+
@@ -216,6 +227,7 @@ env.newPropertyUInt("STEPS", STEPS);
 env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 # Diffusion coefficient(seconds)
 env.newPropertyFloat("DIFFUSION_COEFF", DIFFUSION_COEFF);
+env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", N_SPECIES, DIFFUSION_COEFF_MULTI);
 
 # ------------------------------------------------------
 # ECM BEHAVIOUR 
@@ -256,11 +268,13 @@ env.newPropertyArrayUInt("ALLOW_AGENT_SLIDING", 6, ALLOW_AGENT_SLIDING);
 env.newPropertyFloat("ECM_BOUNDARY_INTERACTION_RADIUS", ECM_BOUNDARY_INTERACTION_RADIUS);
 env.newPropertyFloat("ECM_BOUNDARY_EQUILIBRIUM_DISTANCE", ECM_BOUNDARY_EQUILIBRIUM_DISTANCE);
 
+# Boundary diffusion behavior for multiple species. WARNING: as they are Macro properties, need to be initialized in a host function
+env.newMacroPropertyFloat("BOUNDARY_CONC_INIT_MULTI", N_SPECIES, 6); # a 2D matrix with the 6 boundary conditions (columns) for each species (rows)
+env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES, 6); # a 2D matrix with the 6 boundary conditions (columns) for each species (rows)
 
 # Other globals
 env.newPropertyFloat("PI", 3.1415);
 env.newPropertyUInt("DEBUG_PRINTING", DEBUG_PRINTING);
-
 
 """
   Location messages
@@ -273,8 +287,6 @@ bcorner_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY
 # A message to hold the location of an agent.
 bcorner_location_message.newVariableInt("id");
 
-
-
 ecm_location_message = model.newMessageSpatial3D("ecm_location_message");
 # Set the range and bounds.
 ecm_location_message.setRadius(MAX_SEARCH_RADIUS); 
@@ -285,7 +297,6 @@ ecm_location_message.newVariableInt("id");
 ecm_location_message.newVariableFloat("vx");
 ecm_location_message.newVariableFloat("vy");
 ecm_location_message.newVariableFloat("vz");
-
 
 ecm_grid_location_message = model.newMessageArray3D("ecm_grid_location_message");
 ecm_grid_location_message.setDimensions(ECM_AGENTS_PER_DIR[0], ECM_AGENTS_PER_DIR[1], ECM_AGENTS_PER_DIR[2]);
@@ -314,7 +325,8 @@ bcorner_agent.newVariableFloat("z");
 bcorner_agent.newRTCFunctionFile("bcorner_output_location_data", bcorner_output_location_data_file).setMessageOutput("bcorner_location_message");
 #bcorner_agent.newRTCFunction("bcorner_move", bcorner_move);
 bcorner_agent.newRTCFunctionFile("bcorner_move", bcorner_move_file);
-    
+  
+  
 """
   ECM agent
 """
@@ -373,7 +385,6 @@ ecm_agent.newRTCFunctionFile("ecm_boundary_interaction", ecm_boundary_interactio
 ecm_agent.newRTCFunctionFile("ecm_ecm_interaction", ecm_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
 ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
 ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
-
 
 
 """
@@ -526,10 +537,26 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
 
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
     return
+    
+# This class is used to ensure that corner agents are assigned the first 8 ids
+class initMacroProperties(pyflamegpu.HostFunctionCallback):
+  def run(self,FLAMEGPU):
+    global BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
+    bcim = FLAMEGPU.environment.getMacroPropertyFloat("BOUNDARY_CONC_INIT_MULTI");
+    bcfm = FLAMEGPU.environment.getMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI");
+    for i in range(len(BOUNDARY_CONC_INIT_MULTI)):
+        for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
+            bcim[i][j] = BOUNDARY_CONC_INIT_MULTI[i][j];
+    for i in range(len(BOUNDARY_CONC_FIXED_MULTI)):
+        for j in range(len(BOUNDARY_CONC_FIXED_MULTI[i])):
+            bcfm[i][j] = BOUNDARY_CONC_FIXED_MULTI[i][j];
+    return
 
 # Add function callback to INIT functions for population generation
 initialAgentPopulation = initAgentPopulations();
+initialMacroProperties = initMacroProperties();
 model.addInitFunctionCallback(initialAgentPopulation);
+model.addInitFunctionCallback(initialMacroProperties);
 
 
 """
