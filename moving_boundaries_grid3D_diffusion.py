@@ -64,7 +64,7 @@ VISUALISATION = True;         # Change to false if pyflamegpu has not been built
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;
 SHOW_PLOTS = False;           # Show plots at the end of the simulation
-SAVE_DATA_TO_FILE = False;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_DATA_TO_FILE = True;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
 SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -709,16 +709,23 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
         self.header.append("ECM data")
         self.header.append("ASCII")
         self.header.append("DATASET POLYDATA")
-        self.header.append("POINTS {} float".format(8 + N*N*N)) #8 corners + number of ECM agents 
+        self.header.append("POINTS {} float".format(8 + N*N*N)) #number of ECM agents + 8 corners 
         #self.header.append("POINTS {} float".format(8))         
         self.domaindata = list()
         self.domaindata.append("POLYGONS 6 30")
-        self.domaindata.append("4 0 3 7 4")
-        self.domaindata.append("4 1 2 6 5")
-        self.domaindata.append("4 1 0 4 5")
-        self.domaindata.append("4 2 3 7 6")
-        self.domaindata.append("4 0 1 2 3")
-        self.domaindata.append("4 4 5 6 7")
+        cube_conn = [[4, 0, 3, 7, 4],[4, 1, 2, 6, 5],[4, 1, 0, 4, 5],[4, 2, 3, 7, 6],[4, 0, 1, 2, 3],[4, 4, 5, 6, 7]]
+        for i in range(len(cube_conn)):
+            for j in range(len(cube_conn[i])):
+                if j > 0:
+                    cube_conn[i][j] = cube_conn[i][j] + N*N*N
+            self.domaindata.append(' '.join(str(x) for x in cube_conn[i]))
+            
+        #self.domaindata.append("4 0 3 7 4")
+        #self.domaindata.append("4 1 2 6 5")
+        #self.domaindata.append("4 1 0 4 5")
+        #self.domaindata.append("4 2 3 7 6")
+        #self.domaindata.append("4 0 1 2 3")
+        #self.domaindata.append("4 4 5 6 7")
         self.domaindata.append("CELL_DATA 6")
         self.domaindata.append("SCALARS boundary_index int 1")
         self.domaindata.append("LOOKUP_TABLE default")
@@ -737,7 +744,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
         self.domaindata.append("0 0 -1")
  
     def run(self, FLAMEGPU):
-        global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS
+        global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
         global RES_PATH        
         global stepCounter, fileCounter, BOUNDARY_COORDS
 
@@ -771,6 +778,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 force = list()
                 elastic_energy = list()
                 concentration = list()
+                concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
                 av = agent.getPopulationData(); # this returns a DeviceAgentVector 
                 for ai in av:
                    coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
@@ -781,10 +789,14 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    force.append(force_ai)
                    elastic_energy.append(ai.getVariableFloat("elastic_energy"))
                    concentration.append(ai.getVariableFloat("concentration"))
+                   concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
                 print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
                 with open(str(file_path), 'w') as file:
                     for line in self.header:
                         file.write(line  + '\n')                    
+                    for coords_ai in coords:
+                        file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
+                    # Write boundary positions at the end so that corner points don't cover the points underneath
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[4]))
@@ -793,8 +805,6 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[5]))
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
                     file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
-                    for coords_ai in coords:
-                        file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
                     for line in self.domaindata: 
                         file.write(line  + '\n')
                     file.write("SCALARS boundary_normal_forces float 1" + '\n')
@@ -870,28 +880,51 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                     file.write("0 1 0 \n" if sum_bz_neg_y > 0 else "0 -1 0 \n")                    
                     
                     file.write("POINT_DATA {} \n".format(8 + N*N*N)) #8 corners + number of ECM agents 
-                    file.write("SCALARS elastic_energy float 1" + '\n')
+                    
+                    file.write("SCALARS is_corner int 1" + '\n')   # create this variable to remove them from representations
                     file.write("LOOKUP_TABLE default" + '\n')
+                    
+                    for ee_ai in elastic_energy:
+                        file.write("{0} \n".format(0))
                     for i in range(8):
-                        file.write("0.0 \n") # boundray corners
+                        file.write("1 \n") # boundary corners
+                    
+                    file.write("SCALARS elastic_energy float 1" + '\n')
+                    file.write("LOOKUP_TABLE default" + '\n')                    
                     for ee_ai in elastic_energy:
                         file.write("{:.4f} \n".format(ee_ai))
+                    for i in range(8):
+                        file.write("0.0 \n") # boundary corners
+                        
                     file.write("SCALARS concentration float 1" + '\n')
                     file.write("LOOKUP_TABLE default" + '\n')
-                    for i in range(8):
-                        file.write("0.0 \n") # boundray corners
+                    
                     for c_ai in concentration:
                         file.write("{:.4f} \n".format(c_ai))
-                    file.write("VECTORS velocity float" + '\n')  
                     for i in range(8):
-                        file.write("0.0 0.0 0.0 \n") # boundray corners
+                        file.write("0.0 \n") # boundary corners
+                    
+                    for s in range(N_SPECIES):                    
+                        file.write("SCALARS concentration_species_{0} float 1 \n".format(s))
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        
+                        for c_ai in concentration_multi:
+                            file.write("{:.4f} \n".format(c_ai[s]))
+                        for i in range(8):
+                            file.write("0.0 \n") # boundary corners
+                        
+                    file.write("VECTORS velocity float" + '\n')  
+                    
                     for v_ai in velocity:
                         file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0],v_ai[1],v_ai[2]))
-                    file.write("VECTORS force float" + '\n')  
                     for i in range(8):
-                        file.write("0.0 0.0 0.0 \n") # boundray corners
+                        file.write("0.0 0.0 0.0 \n") # boundary corners
+                    file.write("VECTORS force float" + '\n')  
+                    
                     for f_ai in force:
                         file.write("{:.4f} {:.4f} {:.4f} \n".format(f_ai[0],f_ai[1],f_ai[2]))
+                    for i in range(8):
+                        file.write("0.0 0.0 0.0 \n") # boundary corners
 
                 print ("... succesful save ")
                 print ("=================================")

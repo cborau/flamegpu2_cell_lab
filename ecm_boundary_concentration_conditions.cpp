@@ -72,8 +72,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
 	  float max_conc = 0.0;
 	  for (int j = 0; j < 6; j++) {     // loop through the 6 boundaries
 		if (id == 9){ //print first agent for debugging
-			printf("species id: %d, boundary: [%d] , initial conc -> %2.6f  \n", i+1, j+1, BOUNDARY_CONC_INIT_MULTI[i][j]);
-			printf("species id: %d, boundary: [%d] , fixed conc -> %2.6f  \n", i+1, j+1, BOUNDARY_CONC_FIXED_MULTI[i][j]);
+			printf("species id: %d, boundary: [%d] , initial conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_INIT_MULTI[i][j]);
+			printf("species id: %d, boundary: [%d] , fixed conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_FIXED_MULTI[i][j]);
 		}		
 		if (fabsf(separations[j]) < (ECM_BOUNDARY_INTERACTION_RADIUS)){
 			if (BOUNDARY_CONC_FIXED_MULTI[i][j] > max_conc){
