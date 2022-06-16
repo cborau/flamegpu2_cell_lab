@@ -36,8 +36,12 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float agent_vz = FLAMEGPU->getVariable<float>("vz");
   
   // Agent concentration
-  uint8_t N_SPECIES = FLAMEGPU->getVariable<uint8_t>("N_SPECIES");
+  const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
   float agent_conc = FLAMEGPU->getVariable<float>("concentration");
+  float agent_conc_multi[N_SPECIES];
+  for (int i = 0; i < N_SPECIES; i++) {
+	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
+  }
   
   // Elastinc constant of the ecm 
   const float k_elast = FLAMEGPU->getVariable<float>("k_elast");

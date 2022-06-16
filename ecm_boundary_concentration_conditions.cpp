@@ -8,8 +8,12 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
   float agent_z = FLAMEGPU->getVariable<float>("z");
     
   // Agent concentration
-  uint8_t N_SPECIES = FLAMEGPU->getVariable<uint8_t>("N_SPECIES");
+  const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
   float agent_conc = FLAMEGPU->getVariable<float>("concentration"); 
+  float agent_conc_multi[N_SPECIES];
+  for (int i = 0; i < N_SPECIES; i++) {
+	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
+  }
  
   float separation_x_pos = 0.0;
   float separation_x_neg = 0.0;
@@ -42,6 +46,10 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
   const float BOUNDARY_CONC_FIXED_Y_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_CONC_FIXED", 3);
   const float BOUNDARY_CONC_FIXED_Z_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_CONC_FIXED", 4);
   const float BOUNDARY_CONC_FIXED_Z_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_CONC_FIXED", 5);
+  
+  // Get concentration conditions from macroscopic variables
+  auto BOUNDARY_CONC_INIT_MULTI = FLAMEGPU->environment.getMacroProperty<float, N_SPECIES, 6>("BOUNDARY_CONC_INIT_MULTI");
+  auto BOUNDARY_CONC_FIXED_MULTI = FLAMEGPU->environment.getMacroProperty<float, N_SPECIES, 6>("BOUNDARY_CONC_FIXED_MULTI");
 
   // Check for ecm-boundary separations
   //this takes into account the distance with respect to the actual boundary position, while forces are calculated with respect to boundary initial position
@@ -51,6 +59,40 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
   separation_y_neg = (agent_y - COORD_BOUNDARY_Y_NEG);
   separation_z_pos = (agent_z - COORD_BOUNDARY_Z_POS);
   separation_z_neg = (agent_z - COORD_BOUNDARY_Z_NEG);
+  float separations[6];
+  separations[0] = separation_x_pos;
+  separations[1] = separation_x_neg;
+  separations[2] = separation_y_pos;
+  separations[3] = separation_y_neg;
+  separations[4] = separation_z_pos;
+  separations[5] = separation_z_neg;
+  
+  //
+  for (int i = 0; i < N_SPECIES; i++) { // loop through the species
+	  float max_conc = 0.0;
+	  for (int j = 0; j < 6; j++) {     // loop through the 6 boundaries
+		if (id == 9){ //print first agent for debugging
+			printf("species id: %d, boundary: [%d] , initial conc -> %2.6f  \n", i+1, j+1, BOUNDARY_CONC_INIT_MULTI[i][j]);
+			printf("species id: %d, boundary: [%d] , fixed conc -> %2.6f  \n", i+1, j+1, BOUNDARY_CONC_FIXED_MULTI[i][j]);
+		}		
+		if (fabsf(separations[j]) < (ECM_BOUNDARY_INTERACTION_RADIUS)){
+			if (BOUNDARY_CONC_FIXED_MULTI[i][j] > max_conc){
+					max_conc = BOUNDARY_CONC_FIXED_MULTI[i][j];
+			}
+			if (BOUNDARY_CONC_INIT_MULTI[i][j] > max_conc){
+					max_conc = BOUNDARY_CONC_INIT_MULTI[i][j];
+			}
+		}
+		
+	  }
+	  agent_conc_multi[i] = max_conc; // if an agent is touching several boundaries, the maximum concentration is considered
+  }
+  
+  for (int i = 0; i < N_SPECIES; i++) {
+	  FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
+  }
+  
+  //TODO: remove everything from here down.
 
   // TODO: CHECK ELEMENTS TOUCHING MULTIPLE BOUNDARIES
   // Check concentration conditions

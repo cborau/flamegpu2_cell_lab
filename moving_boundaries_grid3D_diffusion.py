@@ -63,8 +63,9 @@ ENSEMBLE_RUNS = 0;
 VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;
+SHOW_PLOTS = False;           # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = False;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 10;       # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
@@ -81,7 +82,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 100;
+STEPS = 6;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -127,7 +128,7 @@ DIFFUSION_COEFF = 0.0015;                                         # diffusion co
 BOUNDARY_CONC_INIT = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];         # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
 BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0];       # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
 
-N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp
+N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp, ecm_boundary_concentration_conditions.cpp, ecm_ecm_interaction_grid3D.cpp
 DIFFUSION_COEFF_MULTI = [0.15,0.2]                                # diffusion coefficient in [units^2/s] per specie
 BOUNDARY_CONC_INIT_MULTI = [[-1.0, 0.5, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
                             [-1.0, -1.0, 0.6, -1.0, -1.0, -1.0]]  # add as many lines as different species
@@ -230,6 +231,7 @@ env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 # Diffusion coefficient(seconds)
 env.newPropertyFloat("DIFFUSION_COEFF", DIFFUSION_COEFF);
 env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
+# Number of diffusing species
 env.newPropertyUInt("N_SPECIES", N_SPECIES);
 
 # ------------------------------------------------------
@@ -278,6 +280,7 @@ env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES, 6); # a 2D mat
 # Other globals
 env.newPropertyFloat("PI", 3.1415);
 env.newPropertyUInt("DEBUG_PRINTING", DEBUG_PRINTING);
+env.newPropertyFloat("EPSILON", EPSILON);
 
 """
   Location messages
@@ -555,6 +558,9 @@ def resetMacroProperties(self,FLAMEGPU):
     for i in range(len(BOUNDARY_CONC_FIXED_MULTI)):
         for j in range(len(BOUNDARY_CONC_FIXED_MULTI[i])):
             bcfm[i][j] = BOUNDARY_CONC_FIXED_MULTI[i][j]
+    print("Reseting MacroProperties")
+    print(BOUNDARY_CONC_INIT_MULTI)
+    print(BOUNDARY_CONC_FIXED_MULTI)
     return
     
 # This class is used to reset the MacroProperties to the values stored in the global variables
@@ -1280,61 +1286,62 @@ else:
     print(OSCILLATORY_STRAIN_OVER_TIME)
     print()
     # Plotting
-    #fig,ax=plt.subplots(2,3)
-    fig = plt.figure()
-    gs = fig.add_gridspec(2,3)
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax3 = fig.add_subplot(gs[:, 2])
-    ax4 = fig.add_subplot(gs[1, 0])
-    ax5 = fig.add_subplot(gs[1, 1])
-    #BPOS_OVER_TIME.plot()
+    if SHOW_PLOTS:
+        #fig,ax=plt.subplots(2,3)
+        fig = plt.figure()
+        gs = fig.add_gridspec(2,3)
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax3 = fig.add_subplot(gs[:, 2])
+        ax4 = fig.add_subplot(gs[1, 0])
+        ax5 = fig.add_subplot(gs[1, 1])
+        #BPOS_OVER_TIME.plot()
 
-    BPOS_OVER_TIME.plot(ax = ax1)
-    #ax = df['size'].plot(secondary_y=True, color='k', marker='o')
-    ax1.set_xlabel('time step')
-    ax1.set_ylabel('pos')
-    BFORCE_OVER_TIME.plot(ax = ax2)
-    ax2.set_ylabel('normal force')
-    ax2.set_xlabel('time step')
-    BFORCE_SHEAR_OVER_TIME.plot(ax = ax3)
-    ax3.set_ylabel('shear force')
-    ax3.set_xlabel('time step')
-    POISSON_RATIO_OVER_TIME.plot(ax = ax4)
-    ax4.set_ylabel('poisson ratio')
-    ax4.set_xlabel('time step')
-    plt.sca(ax5)
-    plt.plot(BPOS_OVER_TIME['ypos'] - 0.5,  BFORCE_OVER_TIME['fypos'])
-    ax5.set_ylabel('normal force')
-    ax5.set_xlabel('disp')
+        BPOS_OVER_TIME.plot(ax = ax1)
+        #ax = df['size'].plot(secondary_y=True, color='k', marker='o')
+        ax1.set_xlabel('time step')
+        ax1.set_ylabel('pos')
+        BFORCE_OVER_TIME.plot(ax = ax2)
+        ax2.set_ylabel('normal force')
+        ax2.set_xlabel('time step')
+        BFORCE_SHEAR_OVER_TIME.plot(ax = ax3)
+        ax3.set_ylabel('shear force')
+        ax3.set_xlabel('time step')
+        POISSON_RATIO_OVER_TIME.plot(ax = ax4)
+        ax4.set_ylabel('poisson ratio')
+        ax4.set_xlabel('time step')
+        plt.sca(ax5)
+        plt.plot(BPOS_OVER_TIME['ypos'] - 0.5,  BFORCE_OVER_TIME['fypos'])
+        ax5.set_ylabel('normal force')
+        ax5.set_xlabel('disp')
 
-    fig.tight_layout()
+        fig.tight_layout()
 
-    if OSCILLATORY_SHEAR_ASSAY:
-        OSCILLATORY_STRAIN_OVER_TIME.plot()
-        fig2 = plt.figure()
-        colors = np.arange(0, STEPS + 1, 1).tolist()
-        plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'].abs(), marker='o', c=colors, alpha=0.3, cmap='viridis')
-        plt.xlabel('strain')
-        plt.ylabel('shear force');
-        fig3 = plt.figure()
-        colors = np.arange(0, STEPS + 1, 1).tolist()
-        plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'], marker='o', c=colors, alpha=0.3, cmap='viridis')
-        plt.xlabel('strain')
-        plt.ylabel('shear force');
+        if OSCILLATORY_SHEAR_ASSAY:
+            OSCILLATORY_STRAIN_OVER_TIME.plot()
+            fig2 = plt.figure()
+            colors = np.arange(0, STEPS + 1, 1).tolist()
+            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'].abs(), marker='o', c=colors, alpha=0.3, cmap='viridis')
+            plt.xlabel('strain')
+            plt.ylabel('shear force');
+            fig3 = plt.figure()
+            colors = np.arange(0, STEPS + 1, 1).tolist()
+            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'], marker='o', c=colors, alpha=0.3, cmap='viridis')
+            plt.xlabel('strain')
+            plt.ylabel('shear force');
 
-        fig4, ax41 = plt.subplots()
-        x = colors
-        ax42 = ax41.twinx()
-        ax41.plot(x, OSCILLATORY_STRAIN_OVER_TIME['strain'], 'g-')
-        ax42.plot(x, BFORCE_SHEAR_OVER_TIME['fypos_x'], 'b-')
+            fig4, ax41 = plt.subplots()
+            x = colors
+            ax42 = ax41.twinx()
+            ax41.plot(x, OSCILLATORY_STRAIN_OVER_TIME['strain'], 'g-')
+            ax42.plot(x, BFORCE_SHEAR_OVER_TIME['fypos_x'], 'b-')
 
-        ax41.set_xlabel('steps')
-        ax41.set_ylabel('strain', color='g')
-        ax42.set_ylabel('shear force', color='b')
-        ax42.set_ylim(-35,35)
+            ax41.set_xlabel('steps')
+            ax41.set_ylabel('strain', color='g')
+            ax42.set_ylabel('shear force', color='b')
+            ax42.set_ylim(-35,35)
 
 
-    plt.show()
-    #for j in range(len(steps)):
-    #  print("step",j,"ECM",ecm_agent_counts[j]) 
+        plt.show()
+        #for j in range(len(steps)):
+        #  print("step",j,"ECM",ecm_agent_counts[j]) 
