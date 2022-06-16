@@ -64,7 +64,7 @@ VISUALISATION = True;         # Change to false if pyflamegpu has not been built
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;
 SAVE_DATA_TO_FILE = False;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 10;       # Affects both the .vtk files and the Dataframes storing boundary data
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
@@ -74,22 +74,22 @@ EPSILON = 0.0000000001;
 
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 10;
+N = 3;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.012; # seconds
-STEPS = 50;
+TIME_STEP = 0.1; # seconds
+STEPS = 100;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
 ECM_K_ELAST = 1.0;       #[N/units/kg]
-ECM_D_DUMPING = 0.1;     #[N*s/units/kg]
+ECM_D_DUMPING = 1.0;     #[N*s/units/kg]
 ECM_MASS = 1.0;          #[dimensionless to make K and D mass dependent]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.1, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
@@ -99,7 +99,7 @@ BOUNDARY_STIFFNESS_VALUE = 1.0 # N/units
 BOUNDARY_DUMPING_VALUE = 0.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
-CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
+CLAMP_AGENT_TOUCHING_BOUNDARY = [1, 1, 1, 1, 1, 1]; #+X,-X,+Y,-Y,+Z,-Z [bool]
 ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 #ECM_ECM_INTERACTION_RADIUS = 100;
 #ECM_ECM_EQUILIBRIUM_DISTANCE = 0.45;
@@ -123,17 +123,19 @@ if OSCILLATORY_SHEAR_ASSAY:
 
 # Diffusion related paramenters
 #+--------------------------------------------------------------------+
-DIFFUSION_COEFF = 0.15;                                     # diffusion coefficient in [units^2/s]
-BOUNDARY_CONC_INIT = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0];  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]; # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+DIFFUSION_COEFF = 0.0015;                                         # diffusion coefficient in [units^2/s]
+BOUNDARY_CONC_INIT = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];         # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0];       # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
 
-N_SPECIES = 2; # number of diffusing species
-DIFFUSION_COEFF_MULTI = [0.15,0.2]                                 # diffusion coefficient in [units^2/s] per specie
-BOUNDARY_CONC_INIT_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-                            [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]]  # add as many lines as different species
+N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp
+DIFFUSION_COEFF_MULTI = [0.15,0.2]                                # diffusion coefficient in [units^2/s] per specie
+BOUNDARY_CONC_INIT_MULTI = [[-1.0, 0.5, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+                            [-1.0, -1.0, 0.6, -1.0, -1.0, -1.0]]  # add as many lines as different species
                             
-BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
-                             [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
+BOUNDARY_CONC_FIXED_MULTI = [[-1.0, 0.3, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+                             [-1.0, -1.0, 0.7, -1.0, -1.0, -1.0]] # add as many lines as different species
+                             
+INIT_AGENT_CONCENTRATION_VALS = [0.0, 0.0]                        # initial concentration of each species on the agents
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -219,7 +221,7 @@ env = model.Environment();
 # Population size to generate, if no agents are loaded from disk
 env.newPropertyUInt("ECM_POPULATION_TO_GENERATE", ECM_POPULATION_SIZE);
 env.newPropertyUInt("CURRENT_ID", 0);
-env.newPropertyArrayUInt("ECM_AGENTS_PER_DIR", 3,  ECM_AGENTS_PER_DIR); 
+env.newPropertyArrayUInt("ECM_AGENTS_PER_DIR", ECM_AGENTS_PER_DIR); 
 
 # Number of steps to simulate
 env.newPropertyUInt("STEPS", STEPS);
@@ -227,7 +229,8 @@ env.newPropertyUInt("STEPS", STEPS);
 env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 # Diffusion coefficient(seconds)
 env.newPropertyFloat("DIFFUSION_COEFF", DIFFUSION_COEFF);
-env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", N_SPECIES, DIFFUSION_COEFF_MULTI);
+env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
+env.newPropertyUInt("N_SPECIES", N_SPECIES);
 
 # ------------------------------------------------------
 # ECM BEHAVIOUR 
@@ -247,24 +250,24 @@ env.newPropertyFloat("ECM_MASS", ECM_MASS);
 # ------------------------------------------------------
 # Boundaries position
 bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]];  #+X,-X,+Y,-Y,+Z,-Z
-env.newPropertyArrayFloat("COORDS_BOUNDARIES", 6, bcs);
-env.newPropertyArrayFloat("INIT_COORDS_BOUNDARIES", 6, bcs); #this is used to compute elastic forces with respect to initial position
+env.newPropertyArrayFloat("COORDS_BOUNDARIES", bcs);
+env.newPropertyArrayFloat("INIT_COORDS_BOUNDARIES", bcs); #this is used to compute elastic forces with respect to initial position
 
 # Boundaries displacement rate (units/second). 
 # e.g. DISP_BOUNDARY_X_POS = 0.1 means that this boundary moves 0.1 units per second towards +X
-env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES", 6,  BOUNDARY_DISP_RATES); 
-env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", 12,  BOUNDARY_DISP_RATES_PARALLEL); 
+env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES", BOUNDARY_DISP_RATES); 
+env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", BOUNDARY_DISP_RATES_PARALLEL); 
 
 # Boundaries initial concentration and fixed conditions
-env.newPropertyArrayFloat("BOUNDARY_CONC_INIT", 6,  BOUNDARY_CONC_INIT);
-env.newPropertyArrayFloat("BOUNDARY_CONC_FIXED", 6,  BOUNDARY_CONC_FIXED);
+env.newPropertyArrayFloat("BOUNDARY_CONC_INIT", BOUNDARY_CONC_INIT);
+env.newPropertyArrayFloat("BOUNDARY_CONC_FIXED", BOUNDARY_CONC_FIXED);
 
 # Boundary-Agent behaviour
-env.newPropertyArrayUInt("CLAMP_AGENT_TOUCHING_BOUNDARY", 6, CLAMP_AGENT_TOUCHING_BOUNDARY);
-env.newPropertyArrayUInt("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 6, ALLOW_BOUNDARY_ELASTIC_MOVEMENT);
-env.newPropertyArrayFloat("BOUNDARY_STIFFNESS", 6, BOUNDARY_STIFFNESS);
-env.newPropertyArrayFloat("BOUNDARY_DUMPING", 6, BOUNDARY_DUMPING);
-env.newPropertyArrayUInt("ALLOW_AGENT_SLIDING", 6, ALLOW_AGENT_SLIDING);
+env.newPropertyArrayUInt("CLAMP_AGENT_TOUCHING_BOUNDARY", CLAMP_AGENT_TOUCHING_BOUNDARY);
+env.newPropertyArrayUInt("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", ALLOW_BOUNDARY_ELASTIC_MOVEMENT);
+env.newPropertyArrayFloat("BOUNDARY_STIFFNESS", BOUNDARY_STIFFNESS);
+env.newPropertyArrayFloat("BOUNDARY_DUMPING", BOUNDARY_DUMPING);
+env.newPropertyArrayUInt("ALLOW_AGENT_SLIDING", ALLOW_AGENT_SLIDING);
 env.newPropertyFloat("ECM_BOUNDARY_INTERACTION_RADIUS", ECM_BOUNDARY_INTERACTION_RADIUS);
 env.newPropertyFloat("ECM_BOUNDARY_EQUILIBRIUM_DISTANCE", ECM_BOUNDARY_EQUILIBRIUM_DISTANCE);
 
@@ -311,6 +314,7 @@ ecm_grid_location_message.newVariableUInt8("grid_i");
 ecm_grid_location_message.newVariableUInt8("grid_j");
 ecm_grid_location_message.newVariableUInt8("grid_k");
 ecm_grid_location_message.newVariableFloat("concentration");
+ecm_grid_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES);
 
 
 """
@@ -368,7 +372,8 @@ ecm_agent.newVariableFloat("f_bz_neg_y");
 ecm_agent.newVariableFloat("f_extension");
 ecm_agent.newVariableFloat("f_compression");
 ecm_agent.newVariableFloat("elastic_energy");
-ecm_agent.newVariableFloat("concentration"); #concentratoin of diffusing substance (TODO: add more than 1)
+ecm_agent.newVariableFloat("concentration"); #concentratoin of diffusing substance TODO: REMOVE
+ecm_agent.newVariableArrayFloat("concentration_multi", N_SPECIES)
 ecm_agent.newVariableUInt8("clamped_bx_pos");
 ecm_agent.newVariableUInt8("clamped_bx_neg");
 ecm_agent.newVariableUInt8("clamped_by_pos");
@@ -393,6 +398,7 @@ ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunctionCallback):
   def run(self,FLAMEGPU):
+    global INIT_AGENT_CONCENTRATION_VALS, N_SPECIES
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -525,6 +531,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("f_compression", 0.0);
                 instance.setVariableFloat("elastic_energy", 0.0);
                 instance.setVariableFloat("concentration", 0.0);
+                instance.setVariableArrayFloat("concentration_multi", INIT_AGENT_CONCENTRATION_VALS)
                 instance.setVariableUInt8("clamped_bx_pos", 0);
                 instance.setVariableUInt8("clamped_bx_neg", 0);
                 instance.setVariableUInt8("clamped_by_pos", 0);
@@ -538,19 +545,24 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
     return
     
-# This class is used to ensure that corner agents are assigned the first 8 ids
-class initMacroProperties(pyflamegpu.HostFunctionCallback):
-  def run(self,FLAMEGPU):
+def resetMacroProperties(self,FLAMEGPU):
     global BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
     bcim = FLAMEGPU.environment.getMacroPropertyFloat("BOUNDARY_CONC_INIT_MULTI");
     bcfm = FLAMEGPU.environment.getMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI");
     for i in range(len(BOUNDARY_CONC_INIT_MULTI)):
         for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
-            bcim[i][j] = BOUNDARY_CONC_INIT_MULTI[i][j];
+            bcim[i][j] = BOUNDARY_CONC_INIT_MULTI[i][j]
     for i in range(len(BOUNDARY_CONC_FIXED_MULTI)):
         for j in range(len(BOUNDARY_CONC_FIXED_MULTI[i])):
-            bcfm[i][j] = BOUNDARY_CONC_FIXED_MULTI[i][j];
+            bcfm[i][j] = BOUNDARY_CONC_FIXED_MULTI[i][j]
     return
+    
+# This class is used to reset the MacroProperties to the values stored in the global variables
+class initMacroProperties(pyflamegpu.HostFunctionCallback):
+  def run(self,FLAMEGPU):
+    resetMacroProperties(self,FLAMEGPU)
+    return
+    
 
 # Add function callback to INIT functions for population generation
 initialAgentPopulation = initAgentPopulations();
@@ -594,7 +606,8 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
          if OSCILLATORY_SHEAR_ASSAY:   
              if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
-                OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
+                #OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
+                OSCILLATORY_STRAIN_OVER_TIME = pd.concat([OSCILLATORY_STRAIN_OVER_TIME,new_val], ignore_index=True); 
              for d in range(12):
                 if self.apply_parallel_disp[d]:
                     BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * stepCounter) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*t is used because the slope of the sin(w*t) function is needed
@@ -636,7 +649,6 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
          
          if any(dr > 0.0 or dr < 0.0 for dr in BOUNDARY_DISP_RATES):    
             boundaries_moved = True 
-            #coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
             for i in range(6):                
                 BOUNDARY_COORDS[i] += (BOUNDARY_DISP_RATES[i] * TIME_STEP)
             
@@ -674,8 +686,8 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
          if boundaries_moved:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
-                BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
-
+                #BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
+                BPOS_OVER_TIME = pd.concat([BPOS_OVER_TIME,new_pos], ignore_index=True);
 
 
          #print ("End of step: ", stepCounter)
@@ -884,15 +896,32 @@ class UpdateBoundaryConcentration(pyflamegpu.HostFunctionCallback):
     def run(self, FLAMEGPU):    
         global stepCounter, BOUNDARY_CONC_INIT, BOUNDARY_CONC_FIXED
         if stepCounter == 2:
-            print ("====== CONCENTRATION BOUNDARIY CONDITIONS SET  ======")                 
+            print ("====== CONCENTRATION BOUNDARY CONDITIONS SET  ======")                 
             print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT)
             print ("Fixed concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_FIXED)
             ibc = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]  # after first step BOUNDARY_CONC_INIT is reset and BOUNDARY_CONC_FIXED prevails
-            FLAMEGPU.environment.setPropertyArrayFloat("BOUNDARY_CONC_INIT", ibc)       
+            FLAMEGPU.environment.setPropertyArrayFloat("BOUNDARY_CONC_INIT", ibc)   
+
+class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
+    def __init__(self):
+        super().__init__()
+    def run(self, FLAMEGPU):    
+        global stepCounter, BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
+        if stepCounter == 2: # after first step BOUNDARY_CONC_INIT_MULTI is removed (set to -1.0) and BOUNDARY_CONC_FIXED_MULTI prevails
+            print ("====== CONCENTRATION MULTI BOUNDARY CONDITIONS SET  ======")                 
+            print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT_MULTI)
+            print ("Fixed concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_FIXED_MULTI)
+            for i in range(len(BOUNDARY_CONC_INIT_MULTI)):
+                for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
+                    BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0               
+            resetMacroProperties(self,FLAMEGPU)
             
             
 ubc = UpdateBoundaryConcentration()
-model.addStepFunctionCallback(ubc)     
+model.addStepFunctionCallback(ubc)   
+
+ubcm = UpdateBoundaryConcentrationMulti()
+model.addStepFunctionCallback(ubcm)   
      
 sdf = SaveDataToFile()
 model.addStepFunctionCallback(sdf)
@@ -1224,8 +1253,10 @@ else:
                 BFORCE_OVER_TIME = pd.DataFrame([BFORCE(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
                 BFORCE_SHEAR_OVER_TIME = pd.DataFrame([BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
             else:
-                BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True)
-                BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True)
+                #BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True) # deprecated
+                BFORCE_OVER_TIME = pd.concat([BFORCE_OVER_TIME, step_bforce], ignore_index=True)
+                #BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True) # deprecated
+                BFORCE_SHEAR_OVER_TIME = pd.concat([BFORCE_SHEAR_OVER_TIME, step_bforce_shear], ignore_index=True)
             counter+=1;
     print()
     print("============================")

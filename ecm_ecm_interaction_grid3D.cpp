@@ -16,7 +16,7 @@ FLAMEGPU_DEVICE_FUNCTION void vec3Normalize(float &x, float &y, float &z) {
   vec3Div(x, y, z, length);
 }
 
-FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MsgArray3D, flamegpu::MsgNone) {
+FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu::MessageNone) {
   // Agent properties in local register
   int id = FLAMEGPU->getVariable<int>("id");
 
@@ -36,6 +36,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MsgArray3D, flamegpu::Msg
   float agent_vz = FLAMEGPU->getVariable<float>("vz");
   
   // Agent concentration
+  uint8_t N_SPECIES = FLAMEGPU->getVariable<uint8_t>("N_SPECIES");
   float agent_conc = FLAMEGPU->getVariable<float>("concentration");
   
   // Elastinc constant of the ecm 
@@ -70,7 +71,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MsgArray3D, flamegpu::Msg
   uint8_t message_grid_k = 0;
 
   // Initialize other variables
-  float EPSILON = 0.0000000001;
+  float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
   // cross product between agent-message velocity vectors and vector joining agents (direction)
   float cross_agent_vx_dir = 0.0;
   float cross_agent_vy_dir = 0.0;

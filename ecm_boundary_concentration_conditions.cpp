@@ -1,4 +1,4 @@
-FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::MsgNone, flamegpu::MsgNone) {
+FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::MessageNone, flamegpu::MessageNone) {
   // Agent properties in local register
   int id = FLAMEGPU->getVariable<int>("id");
 
@@ -8,6 +8,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::MsgNone
   float agent_z = FLAMEGPU->getVariable<float>("z");
     
   // Agent concentration
+  uint8_t N_SPECIES = FLAMEGPU->getVariable<uint8_t>("N_SPECIES");
   float agent_conc = FLAMEGPU->getVariable<float>("concentration"); 
  
   float separation_x_pos = 0.0;
@@ -18,7 +19,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::MsgNone
   float separation_z_neg = 0.0;
   const float ECM_BOUNDARY_INTERACTION_RADIUS = FLAMEGPU->environment.getProperty<float>("ECM_BOUNDARY_INTERACTION_RADIUS");
   const float ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = FLAMEGPU->environment.getProperty<float>("ECM_BOUNDARY_EQUILIBRIUM_DISTANCE");
-  float EPSILON = 0.0000000001;
+  float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
 
   // Get position of the boundaries
   const float COORD_BOUNDARY_X_POS = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",0);

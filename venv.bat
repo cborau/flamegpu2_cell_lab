@@ -7,6 +7,6 @@ set config=Debug
 IF NOT "%2"=="" (
     set config=%2
 )
-cd ../../%build_dir%/lib/%config%/python/venv/Scripts
+cd ../../%build_dir%/lib/Release/python/venv/Scripts
 call activate.bat
 cd ../../../../../../examples/moving_boundaries_diffusion
