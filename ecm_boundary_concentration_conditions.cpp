@@ -82,8 +82,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
 			if (BOUNDARY_CONC_INIT_MULTI[i][j] > max_conc){
 					max_conc = BOUNDARY_CONC_INIT_MULTI[i][j];
 			}
-		}
-		
+		}		
 	  }
 	  agent_conc_multi[i] = max_conc; // if an agent is touching several boundaries, the maximum concentration is considered
   }

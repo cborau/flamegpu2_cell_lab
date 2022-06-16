@@ -66,6 +66,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float message_y = 0.0;
   float message_z = 0.0;
   float message_conc = 0.0;
+  float message_conc_multi[N_SPECIES]; //initialize values to 0.0
   int message_id = 0;
   float message_vx = 0.0;
   float message_vy = 0.0;
@@ -118,12 +119,21 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float n_left_conc = 0.0; 
   float n_front_conc = 0.0; 
   float n_back_conc = 0.0; 
-  float n_up_dist = 0.0; // distance of agent on top of current one
+  float n_up_dist = 0.0; 
   float n_down_dist = 0.0;
   float n_right_dist = 0.0; 
   float n_left_dist = 0.0; 
   float n_front_dist = 0.0; 
-  float n_back_dist = 0.0;   
+  float n_back_dist = 0.0; 
+
+  // Concentration and distance data of Neuman neighbourhood. Needed to solve diffusion equation for multiple species
+  float n_up_conc_multi[N_SPECIES]; // concentration of agent on top of current one
+  float n_down_conc_multi[N_SPECIES];
+  float n_right_conc_multi[N_SPECIES]; 
+  float n_left_conc_multi[N_SPECIES]; 
+  float n_front_conc_multi[N_SPECIES]; 
+  float n_back_conc_multi[N_SPECIES]; 
+  
 
   //printf("Interaction agent %d [%d %d %d]\n", id, agent_grid_i, agent_grid_j, agent_grid_k);
 
@@ -137,6 +147,9 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
     message_grid_j = message.getVariable<uint8_t>("grid_j");
     message_grid_k = message.getVariable<uint8_t>("grid_k");
 	message_conc = message.getVariable<float>("concentration");
+	for (int i = 0; i < N_SPECIES; i++) {
+	  message_conc_multi[i] = message.getVariable<float, N_SPECIES>("concentration_multi", i);
+	}
 
     i_diff = abs(agent_grid_i - message_grid_i);
     j_diff = abs(agent_grid_j - message_grid_j);
@@ -188,6 +201,22 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 			if (message_grid_k > agent_grid_k) 
 				n_up_conc = message_conc;
 				n_up_dist = distance;
+				
+			// For multiple species diffusion
+			for (int i = 0; i < N_SPECIES; i++) {
+			    if (message_grid_i < agent_grid_i) 
+					n_left_conc_multi[i] = message_conc_multi[i];
+				if (message_grid_i > agent_grid_i) 
+					n_right_conc_multi[i] = message_conc_multi[i];
+				if (message_grid_j < agent_grid_j) 
+					n_back_conc_multi[i] = message_conc_multi[i];
+				if (message_grid_j > agent_grid_j) 
+					n_front_conc_multi[i] = message_conc_multi[i];
+				if (message_grid_k < agent_grid_k) 
+					n_down_conc_multi[i] = message_conc_multi[i];
+				if (message_grid_k > agent_grid_k) 
+					n_up_conc_multi[i] = message_conc_multi[i];
+			}
         }		
         
         message_vx = message.getVariable<float>("vx");
@@ -260,6 +289,21 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
   float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
   agent_conc = agent_conc_prev + Fx * (n_left_conc - (2 * agent_conc_prev) + n_right_conc) + Fy * (n_front_conc - (2 * agent_conc_prev) + n_back_conc) + Fz * (n_up_conc - (2 * agent_conc_prev) + n_down_conc) + R * DELTA_TIME;
+  
+  //Apply diffusion equation for multiple species
+  float agent_conc_prev_multi[N_SPECIES];
+  for (int i = 0; i < N_SPECIES; i++) {
+	agent_conc_prev_multi[i] = agent_conc_multi[i];
+    agent_conc_multi[i] = agent_conc_prev_multi[i] + Fx * (n_left_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_right_conc_multi[i]) + Fy * (n_front_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_back_conc_multi[i]) + Fz * (n_up_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_down_conc_multi[i]) + R * DELTA_TIME;
+    FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
+	  
+	printf("DIFFUSION for agent %d, species %d, [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, i+1, dx, dy, dz, Fx, Fy, Fz);
+	printf("agent %d: MULTI left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc_multi[i], n_right_conc_multi[i]);
+	printf("agent %d: MULTI front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc_multi[i], n_back_conc_multi[i]);
+	printf("agent %d: MULTI up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc_multi[i], n_down_conc_multi[i]);
+	printf("agent %d: MULTI conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev_multi[i], agent_conc_multi[i]);  
+  }
+  
   
   if (DEBUG_PRINTING == 1){
 	printf("DIFFUSION for agent %d , [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, dx, dy, dz, Fx, Fy, Fz);
