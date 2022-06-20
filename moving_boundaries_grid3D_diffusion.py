@@ -69,20 +69,20 @@ SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes s
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
-print("Executing in ", CURR_PATH);
 MAX_SEARCH_RADIUS = 2.0;      # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
 EPSILON = 0.0000000001;
 
+print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 3;
+N = 10;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 6;
+STEPS = 50;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -124,17 +124,17 @@ if OSCILLATORY_SHEAR_ASSAY:
 
 # Diffusion related paramenters
 #+--------------------------------------------------------------------+
-DIFFUSION_COEFF = 0.0015;                                         # diffusion coefficient in [units^2/s]
+DIFFUSION_COEFF = 0.02;                                           # diffusion coefficient in [units^2/s]
 BOUNDARY_CONC_INIT = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];         # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-BOUNDARY_CONC_FIXED = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0];       # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+BOUNDARY_CONC_FIXED = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];        # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
 
 N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp, ecm_boundary_concentration_conditions.cpp, ecm_ecm_interaction_grid3D.cpp
-DIFFUSION_COEFF_MULTI = [0.15,0.2]                                # diffusion coefficient in [units^2/s] per specie
-BOUNDARY_CONC_INIT_MULTI = [[-1.0, 0.5, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-                            [-1.0, -1.0, 0.6, -1.0, -1.0, -1.0]]  # add as many lines as different species
+DIFFUSION_COEFF_MULTI = [0.02,0.02]                               # diffusion coefficient in [units^2/s] per specie
+BOUNDARY_CONC_INIT_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+                            [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]]  # add as many lines as different species
                             
-BOUNDARY_CONC_FIXED_MULTI = [[-1.0, 0.3, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
-                             [-1.0, -1.0, 0.7, -1.0, -1.0, -1.0]] # add as many lines as different species
+BOUNDARY_CONC_FIXED_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+                             [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_AGENT_CONCENTRATION_VALS = [0.0, 0.0]                        # initial concentration of each species on the agents
 
