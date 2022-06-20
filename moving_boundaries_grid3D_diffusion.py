@@ -75,7 +75,7 @@ EPSILON = 0.0000000001;
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 10;
+N = 4;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
@@ -132,7 +132,8 @@ BOUNDARY_CONC_INIT_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0],  # initial conc
 BOUNDARY_CONC_FIXED_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
                              [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
-INIT_AGENT_CONCENTRATION_VALS = [0.0, 0.0]                        # initial concentration of each species on the agents
+INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
+INIT_VASCULZARIZATION_CONCENTRATION_VALS = [1.0, 0.5]             # initial concentration of each species on the VASCULARIZATION agents
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -191,12 +192,22 @@ if critical_error:
   FLAME GPU 2 implementation of mechanical assays via moving boundaries and extracellular matrix (ecm) agents by using spatial3D messaging.
 """
 
+# Files containing agent functions for agents, which outputs publicly visible properties to a message list
+
+"""
+  VASCULARIZATION  
+"""
+vascularization_output_location_data_file = "vascularization_output_location_data.cpp";
+vascularization_move_file = "vascularization_move.cpp";
+
+"""
+  BCORNER  
+"""
 bcorner_output_location_data_file = "bcorner_output_location_data.cpp";
 bcorner_move_file = "bcorner_move.cpp";
 
 """
   ECM
-  ecm_output_location_data agent function for ECM agents, which outputs publicly visible properties to a message list
 """
 ecm_output_location_data_file = "ecm_output_location_data.cpp";
 ecm_output_grid_location_data_file = "ecm_output_grid_location_data.cpp";
@@ -275,26 +286,26 @@ env.newPropertyUInt("DEBUG_PRINTING", DEBUG_PRINTING);
 env.newPropertyFloat("EPSILON", EPSILON);
 
 """
-  Location messages
+  LOCATION MESSAGES
 """
 bcorner_location_message = model.newMessageSpatial3D("bcorner_location_message");
 # Set the range and bounds.
 bcorner_location_message.setRadius(1.0); #corners are not actually interacting with anything
 bcorner_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
 bcorner_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
-# A message to hold the location of an agent.
+# A message to hold the location of an agent. WARNING: spatial3D messages already define x,y,z variables internally.
 bcorner_location_message.newVariableInt("id");
 
-ecm_location_message = model.newMessageSpatial3D("ecm_location_message");
+vascularization_location_message = model.newMessageSpatial3D("vascularization_location_message");
 # Set the range and bounds.
-ecm_location_message.setRadius(MAX_SEARCH_RADIUS); 
-ecm_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
-ecm_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
-# A message to hold the location of an agent.
-ecm_location_message.newVariableInt("id");
-ecm_location_message.newVariableFloat("vx");
-ecm_location_message.newVariableFloat("vy");
-ecm_location_message.newVariableFloat("vz");
+vascularization_location_message.setRadius(MAX_SEARCH_RADIUS); 
+vascularization_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
+vascularization_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
+vascularization_location_message.newVariableInt("id");
+vascularization_location_message.newVariableFloat("vx");
+vascularization_location_message.newVariableFloat("vy");
+vascularization_location_message.newVariableFloat("vz");
+vascularization_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES);
 
 ecm_grid_location_message = model.newMessageArray3D("ecm_grid_location_message");
 ecm_grid_location_message.setDimensions(ECM_AGENTS_PER_DIR[0], ECM_AGENTS_PER_DIR[1], ECM_AGENTS_PER_DIR[2]);
@@ -310,6 +321,25 @@ ecm_grid_location_message.newVariableUInt8("grid_j");
 ecm_grid_location_message.newVariableUInt8("grid_k");
 ecm_grid_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES);
 
+"""
+  AGENTS
+"""
+
+"""
+  Vascularization agent
+"""
+vascularization_agent = model.newAgent("VASCULARIZATION");
+vascularization_agent.newVariableInt("id");
+vascularization_agent.newVariableFloat("x");
+vascularization_agent.newVariableFloat("y");
+vascularization_agent.newVariableFloat("z");
+vascularization_agent.newVariableFloat("vx");
+vascularization_agent.newVariableFloat("vy");
+vascularization_agent.newVariableFloat("vz");
+vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES)
+
+vascularization_agent.newRTCFunctionFile("vascularization_output_location_data", vascularization_output_location_data_file).setMessageOutput("vascularization_location_message");
+vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file);
 
 """
   Boundary corner agent
@@ -321,7 +351,6 @@ bcorner_agent.newVariableFloat("y");
 bcorner_agent.newVariableFloat("z");
 
 bcorner_agent.newRTCFunctionFile("bcorner_output_location_data", bcorner_output_location_data_file).setMessageOutput("bcorner_location_message");
-#bcorner_agent.newRTCFunction("bcorner_move", bcorner_move);
 bcorner_agent.newRTCFunctionFile("bcorner_move", bcorner_move_file);
   
   
@@ -381,6 +410,7 @@ ecm_agent.newVariableUInt8("grid_k");
 ecm_agent.newRTCFunctionFile("ecm_output_grid_location_data", ecm_output_grid_location_data_file).setMessageOutput("ecm_grid_location_message");
 ecm_agent.newRTCFunctionFile("ecm_boundary_interaction", ecm_boundary_interaction_file);
 ecm_agent.newRTCFunctionFile("ecm_ecm_interaction", ecm_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
+ecm_agent.newRTCFunctionFile("ecm_vascularization_interaction", ecm_vascularization_interaction_file).setMessageInput("vascularization_location_message");
 ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
 ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
 
@@ -391,7 +421,7 @@ ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunctionCallback):
   def run(self,FLAMEGPU):
-    global INIT_AGENT_CONCENTRATION_VALS, N_SPECIES
+    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -451,7 +481,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
         sys.exit("Bad initialization of boundary corners!");
 
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", 8);
-  
+    
     # ECM
     populationSize = FLAMEGPU.environment.getPropertyUInt("ECM_POPULATION_TO_GENERATE");
     min_pos = -1.0;
@@ -523,7 +553,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("f_extension", 0.0);
                 instance.setVariableFloat("f_compression", 0.0);
                 instance.setVariableFloat("elastic_energy", 0.0);
-                instance.setVariableArrayFloat("concentration_multi", INIT_AGENT_CONCENTRATION_VALS)
+                instance.setVariableArrayFloat("concentration_multi", INIT_ECM_CONCENTRATION_VALS)
                 instance.setVariableUInt8("clamped_bx_pos", 0);
                 instance.setVariableUInt8("clamped_bx_neg", 0);
                 instance.setVariableUInt8("clamped_by_pos", 0);
@@ -533,6 +563,21 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableUInt8("grid_i", i);
                 instance.setVariableUInt8("grid_j", j);
                 instance.setVariableUInt8("grid_k", k);
+                
+    # VASCULARIZATION
+    # TODO: read from file?
+    # For now, manual initialization
+    for i in range(agents_per_dir[1]+1):
+        instance = FLAMEGPU.agent("VASCULARIZATION").newAgent();
+        instance.setVariableInt("id", current_id+count);
+        instance.setVariableFloat("x", 0.0);
+        instance.setVariableFloat("y", ((i) * 1.0 / agents_per_dir[1]) - 0.5);
+        instance.setVariableFloat("z", 0.0);
+        instance.setVariableFloat("vx", 0.0);
+        instance.setVariableFloat("vy", 0.0);
+        instance.setVariableFloat("vz", 0.0);
+        instance.setVariableArrayFloat("concentration_multi", INIT_VASCULZARIZATION_CONCENTRATION_VALS)
+        
 
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
     return
@@ -940,9 +985,10 @@ model.addStepFunctionCallback(mb)
 """
   Control flow
 """    
-# Layer #1
+# Layer #1: location of agents
 model.newLayer("L1").addAgentFunction("ECM", "ecm_output_grid_location_data");
 model.Layer("L1").addAgentFunction("BCORNER", "bcorner_output_location_data");
+model.Layer("L1").addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
 # Layer #2
 model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
 # Layer #3
@@ -951,9 +997,10 @@ model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditio
 model.newLayer("L4").addAgentFunction("ECM", "ecm_ecm_interaction");
 # Layer #5
 model.newLayer("L5").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
-# Layer #6
+# Layer #6: movement of agents
 model.newLayer("L6").addAgentFunction("ECM", "ecm_move");
 model.Layer("L6").addAgentFunction("BCORNER", "bcorner_move");
+model.Layer("L6").addAgentFunction("VASCULARIZATION", "vascularization_move");
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
@@ -1048,6 +1095,10 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
     square_bcorner_agt.setModel(pyflamegpu.CUBE);
     square_bcorner_agt.setModelScale(0.05);
     square_bcorner_agt.setColor(pyflamegpu.RED);
+    square_vascularization_agt = visualisation.addAgent("VASCULARIZATION");
+    square_vascularization_agt.setModel(pyflamegpu.CUBE);
+    square_vascularization_agt.setModelScale(0.035);
+    square_vascularization_agt.setColor(pyflamegpu.BLUE);
 
     pen = visualisation.newLineSketch(1, 1, 1, 0.8); 
     pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
