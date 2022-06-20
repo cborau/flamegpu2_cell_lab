@@ -124,10 +124,6 @@ if OSCILLATORY_SHEAR_ASSAY:
 
 # Diffusion related paramenters
 #+--------------------------------------------------------------------+
-DIFFUSION_COEFF = 0.02;                                           # diffusion coefficient in [units^2/s]
-BOUNDARY_CONC_INIT = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];         # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-BOUNDARY_CONC_FIXED = [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0];        # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
-
 N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp, ecm_boundary_concentration_conditions.cpp, ecm_ecm_interaction_grid3D.cpp
 DIFFUSION_COEFF_MULTI = [0.02,0.02]                               # diffusion coefficient in [units^2/s] per specie
 BOUNDARY_CONC_INIT_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
@@ -175,11 +171,12 @@ if (len(DIFFUSION_COEFF_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_INIT_MULTI) !
     critical_error = True
 # Check diffusion values for numerical stability
 dxdydz = 1.0 / (N - 1)
-Fi = 3 * (DIFFUSION_COEFF * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
-print('Fi value: {0}'.format(Fi))
-if Fi > 0.5:
-    print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
-    critical_error = True
+for i in range(N_SPECIES):
+    Fi = 3 * (DIFFUSION_COEFF_MULTI[i] * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
+    print('Fi value: {0} for species {1}'.format(Fi,i+1))
+    if Fi > 0.5:
+        print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
+        critical_error = True
     
 
 if critical_error:
@@ -229,7 +226,6 @@ env.newPropertyUInt("STEPS", STEPS);
 # Time increment (seconds)
 env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 # Diffusion coefficient(seconds)
-env.newPropertyFloat("DIFFUSION_COEFF", DIFFUSION_COEFF);
 env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
 # Number of diffusing species
 env.newPropertyUInt("N_SPECIES", N_SPECIES);
@@ -259,10 +255,6 @@ env.newPropertyArrayFloat("INIT_COORDS_BOUNDARIES", bcs); #this is used to compu
 # e.g. DISP_BOUNDARY_X_POS = 0.1 means that this boundary moves 0.1 units per second towards +X
 env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES", BOUNDARY_DISP_RATES); 
 env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", BOUNDARY_DISP_RATES_PARALLEL); 
-
-# Boundaries initial concentration and fixed conditions
-env.newPropertyArrayFloat("BOUNDARY_CONC_INIT", BOUNDARY_CONC_INIT);
-env.newPropertyArrayFloat("BOUNDARY_CONC_FIXED", BOUNDARY_CONC_FIXED);
 
 # Boundary-Agent behaviour
 env.newPropertyArrayUInt("CLAMP_AGENT_TOUCHING_BOUNDARY", CLAMP_AGENT_TOUCHING_BOUNDARY);
@@ -316,7 +308,6 @@ ecm_grid_location_message.newVariableFloat("vz");
 ecm_grid_location_message.newVariableUInt8("grid_i");
 ecm_grid_location_message.newVariableUInt8("grid_j");
 ecm_grid_location_message.newVariableUInt8("grid_k");
-ecm_grid_location_message.newVariableFloat("concentration");
 ecm_grid_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES);
 
 
@@ -375,7 +366,6 @@ ecm_agent.newVariableFloat("f_bz_neg_y");
 ecm_agent.newVariableFloat("f_extension");
 ecm_agent.newVariableFloat("f_compression");
 ecm_agent.newVariableFloat("elastic_energy");
-ecm_agent.newVariableFloat("concentration"); #concentratoin of diffusing substance TODO: REMOVE
 ecm_agent.newVariableArrayFloat("concentration_multi", N_SPECIES)
 ecm_agent.newVariableUInt8("clamped_bx_pos");
 ecm_agent.newVariableUInt8("clamped_bx_neg");
@@ -533,7 +523,6 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("f_extension", 0.0);
                 instance.setVariableFloat("f_compression", 0.0);
                 instance.setVariableFloat("elastic_energy", 0.0);
-                instance.setVariableFloat("concentration", 0.0);
                 instance.setVariableArrayFloat("concentration_multi", INIT_AGENT_CONCENTRATION_VALS)
                 instance.setVariableUInt8("clamped_bx_pos", 0);
                 instance.setVariableUInt8("clamped_bx_neg", 0);
@@ -777,7 +766,6 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 velocity = list()
                 force = list()
                 elastic_energy = list()
-                concentration = list()
                 concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
                 av = agent.getPopulationData(); # this returns a DeviceAgentVector 
                 for ai in av:
@@ -788,7 +776,6 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    velocity.append(velocity_ai)
                    force.append(force_ai)
                    elastic_energy.append(ai.getVariableFloat("elastic_energy"))
-                   concentration.append(ai.getVariableFloat("concentration"))
                    concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
                 print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
                 with open(str(file_path), 'w') as file:
@@ -895,15 +882,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                         file.write("{:.4f} \n".format(ee_ai))
                     for i in range(8):
                         file.write("0.0 \n") # boundary corners
-                        
-                    file.write("SCALARS concentration float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    
-                    for c_ai in concentration:
-                        file.write("{:.4f} \n".format(c_ai))
-                    for i in range(8):
-                        file.write("0.0 \n") # boundary corners
-                    
+                                            
                     for s in range(N_SPECIES):                    
                         file.write("SCALARS concentration_species_{0} float 1 \n".format(s))
                         file.write("LOOKUP_TABLE default" + '\n')
@@ -929,17 +908,6 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 print ("... succesful save ")
                 print ("=================================")
 
-class UpdateBoundaryConcentration(pyflamegpu.HostFunctionCallback):
-    def __init__(self):
-        super().__init__()
-    def run(self, FLAMEGPU):    
-        global stepCounter, BOUNDARY_CONC_INIT, BOUNDARY_CONC_FIXED
-        if stepCounter == 2:
-            print ("====== CONCENTRATION BOUNDARY CONDITIONS SET  ======")                 
-            print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT)
-            print ("Fixed concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_FIXED)
-            ibc = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]  # after first step BOUNDARY_CONC_INIT is reset and BOUNDARY_CONC_FIXED prevails
-            FLAMEGPU.environment.setPropertyArrayFloat("BOUNDARY_CONC_INIT", ibc)   
 
 class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
     def __init__(self):
@@ -955,9 +923,6 @@ class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
                     BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0               
             resetMacroProperties(self,FLAMEGPU)
             
-            
-ubc = UpdateBoundaryConcentration()
-model.addStepFunctionCallback(ubc)   
 
 ubcm = UpdateBoundaryConcentrationMulti()
 model.addStepFunctionCallback(ubcm)   
@@ -1078,8 +1043,7 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
     f_max = ECM_K_ELAST * (ECM_ECM_EQUILIBRIUM_DISTANCE);
     max_energy = 0.5 * (f_max * f_max ) / ECM_K_ELAST;
     print("max force, max energy: ", f_max, max_energy);
-    #circ_ecm_agt.setColor(pyflamegpu.HSVInterpolation.GREENRED("elastic_energy",0.00000001, max_energy * 1.0));
-    circ_ecm_agt.setColor(pyflamegpu.HSVInterpolation.GREENRED("concentration",0.0, 0.7));      
+    circ_ecm_agt.setColor(pyflamegpu.HSVInterpolation.GREENRED("elastic_energy",0.00000001, max_energy * 1.0));     
     square_bcorner_agt = visualisation.addAgent("BCORNER");
     square_bcorner_agt.setModel(pyflamegpu.CUBE);
     square_bcorner_agt.setModelScale(0.05);

@@ -37,7 +37,6 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   // Agent concentration
   const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
-  float agent_conc = FLAMEGPU->getVariable<float>("concentration");
   float agent_conc_multi[N_SPECIES];
   for (int i = 0; i < N_SPECIES; i++) {
 	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
@@ -48,8 +47,6 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   // Dumping constant of the ecm 
   const float d_dumping = FLAMEGPU->getVariable<float>("d_dumping");
-  
-  const float DIFFUSION_COEFF = FLAMEGPU->environment.getProperty<float>("DIFFUSION_COEFF");
   const float ECM_ECM_EQUILIBRIUM_DISTANCE = FLAMEGPU->environment.getProperty<float>("ECM_ECM_EQUILIBRIUM_DISTANCE");
   // Equilibrium distance must be adapted depending on the message grid position respect to the agent. Messages in the Neuman neighbourhood will use the original
   // whereas messages in the diagonals will use increased values.
@@ -112,13 +109,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   int ct = 0;
   int DEBUG_PRINTING = FLAMEGPU->environment.getProperty<int>("DEBUG_PRINTING");
   
-  // Concentration and distance data of Neuman neighbourhood. Needed to solve diffusion equation
-  float n_up_conc = 0.0; // concentration of agent on top of current one
-  float n_down_conc = 0.0;
-  float n_right_conc = 0.0; 
-  float n_left_conc = 0.0; 
-  float n_front_conc = 0.0; 
-  float n_back_conc = 0.0; 
+  // Distance data of Neuman neighbourhood. Needed to solve diffusion equation
   float n_up_dist = 0.0; 
   float n_down_dist = 0.0;
   float n_right_dist = 0.0; 
@@ -146,7 +137,6 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
     message_grid_i = message.getVariable<uint8_t>("grid_i");
     message_grid_j = message.getVariable<uint8_t>("grid_j");
     message_grid_k = message.getVariable<uint8_t>("grid_k");
-	message_conc = message.getVariable<float>("concentration");
 	for (int i = 0; i < N_SPECIES; i++) {
 	  message_conc_multi[i] = message.getVariable<float, N_SPECIES>("concentration_multi", i);
 	}
@@ -183,23 +173,17 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
         distance = vec3Length(dir_x, dir_y, dir_z);    
 
 		if (conn < 2) {			
-			if (message_grid_i < agent_grid_i) 
-				n_left_conc = message_conc;
+			if (message_grid_i < agent_grid_i)				
 				n_left_dist = distance;
 			if (message_grid_i > agent_grid_i) 
-				n_right_conc = message_conc;
 				n_right_dist = distance;
 			if (message_grid_j < agent_grid_j) 
-				n_back_conc = message_conc;
 				n_back_dist = distance;
 			if (message_grid_j > agent_grid_j) 
-				n_front_conc = message_conc;
 				n_front_dist = distance;
 			if (message_grid_k < agent_grid_k) 
-				n_down_conc = message_conc;
 				n_down_dist = distance;
 			if (message_grid_k > agent_grid_k) 
-				n_up_conc = message_conc;
 				n_up_dist = distance;
 				
 			// For multiple species diffusion
@@ -281,22 +265,21 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   //Apply diffusion equation
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float R = 0.0; // reactive term. Unused for now
-  float agent_conc_prev = agent_conc;
   float dx = ((n_left_dist > 0.0) & (n_right_dist > 0.0)) ? (n_left_dist + n_right_dist) / 2.0 : fmaxf(n_left_dist,n_right_dist);
   float dy = ((n_front_dist > 0.0) & (n_back_dist > 0.0)) ? (n_front_dist + n_back_dist) / 2.0 : fmaxf(n_front_dist,n_back_dist);
   float dz = ((n_up_dist > 0.0) & (n_down_dist > 0.0)) ? (n_up_dist + n_down_dist) / 2.0 : fmaxf(n_up_dist,n_down_dist);
-  float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);
-  float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
-  float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
-  agent_conc = agent_conc_prev + Fx * (n_left_conc - (2 * agent_conc_prev) + n_right_conc) + Fy * (n_front_conc - (2 * agent_conc_prev) + n_back_conc) + Fz * (n_up_conc - (2 * agent_conc_prev) + n_down_conc) + R * DELTA_TIME;
   
   //Apply diffusion equation for multiple species
   float agent_conc_prev_multi[N_SPECIES];
   for (int i = 0; i < N_SPECIES; i++) {
+	float DIFFUSION_COEFF = FLAMEGPU->environment.getProperty<float>("DIFFUSION_COEFF_MULTI",i);
+	float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);
+    float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
+    float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
 	agent_conc_prev_multi[i] = agent_conc_multi[i];
     agent_conc_multi[i] = agent_conc_prev_multi[i] + Fx * (n_left_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_right_conc_multi[i]) + Fy * (n_front_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_back_conc_multi[i]) + Fz * (n_up_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_down_conc_multi[i]) + R * DELTA_TIME;
     FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
-	if (id == 22){  
+	if ((id == 22) && (DEBUG_PRINTING == 1)){  
 		printf("DIFFUSION for agent %d, species %d, [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, i+1, dx, dy, dz, Fx, Fy, Fz);
 		printf("agent %d: MULTI left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc_multi[i], n_right_conc_multi[i]);
 		printf("agent %d: MULTI front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc_multi[i], n_back_conc_multi[i]);
@@ -306,22 +289,13 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   }
   
   
-  if (id == 22){
-	printf("DIFFUSION for agent %d , [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, dx, dy, dz, Fx, Fy, Fz);
-	printf("agent %d: left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc, n_right_conc);
-    printf("agent %d: front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc, n_back_conc);
-    printf("agent %d: up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc, n_down_conc);
-    printf("agent %d: conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev, agent_conc);  
-  }
-  
-
   FLAMEGPU->setVariable<float>("fx", agent_fx);
   FLAMEGPU->setVariable<float>("fy", agent_fy);
   FLAMEGPU->setVariable<float>("fz", agent_fz);
   FLAMEGPU->setVariable<float>("f_extension", agent_f_extension);
   FLAMEGPU->setVariable<float>("f_compression", agent_f_compression);
   FLAMEGPU->setVariable<float>("elastic_energy", agent_elastic_energy);
-  FLAMEGPU->setVariable<float>("concentration", agent_conc);
+
 
   return flamegpu::ALIVE;
 }
