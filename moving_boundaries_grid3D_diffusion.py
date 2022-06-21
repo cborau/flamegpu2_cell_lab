@@ -81,7 +81,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 10;
+STEPS = 50;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -108,8 +108,8 @@ print("ECM_ECM_EQUILIBRIUM_DISTANCE: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
-MAX_SEARCH_RADIUS = 2.0 * ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-
+MAX_SEARCH_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
+print("Message rad: ", MAX_SEARCH_RADIUS)
 OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
 OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
@@ -134,8 +134,8 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
-INCLUDE_VASCULARIZATION = True;                                   # if True, vascularization is taken into account     
-INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, 0.5]              # initial concentration of each species on the VASCULARIZATION agents
+INCLUDE_VASCULARIZATION = False;                                   # if True, vascularization is taken into account     
+INIT_VASCULARIZATION_CONCENTRATION_VALS = [-1.0, -0.5]              # initial concentration of each species on the VASCULARIZATION agents
 N_VASCULARIZATION_POINTS = 0;                                     # declared here. Points are loaded from file
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
@@ -332,17 +332,18 @@ ecm_grid_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES
 """
   Vascularization agent
 """
-vascularization_agent = model.newAgent("VASCULARIZATION");
-vascularization_agent.newVariableInt("id");
-vascularization_agent.newVariableFloat("x");
-vascularization_agent.newVariableFloat("y");
-vascularization_agent.newVariableFloat("z");
-vascularization_agent.newVariableFloat("vx");
-vascularization_agent.newVariableFloat("vy");
-vascularization_agent.newVariableFloat("vz");
-vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES);
-vascularization_agent.newRTCFunctionFile("vascularization_output_location_data", vascularization_output_location_data_file).setMessageOutput("vascularization_location_message");
-vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file);
+if INCLUDE_VASCULARIZATION:
+    vascularization_agent = model.newAgent("VASCULARIZATION");
+    vascularization_agent.newVariableInt("id");
+    vascularization_agent.newVariableFloat("x");
+    vascularization_agent.newVariableFloat("y");
+    vascularization_agent.newVariableFloat("z");
+    vascularization_agent.newVariableFloat("vx");
+    vascularization_agent.newVariableFloat("vy");
+    vascularization_agent.newVariableFloat("vz");
+    vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES);
+    vascularization_agent.newRTCFunctionFile("vascularization_output_location_data", vascularization_output_location_data_file).setMessageOutput("vascularization_location_message");
+    vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file);
 
 """
   Boundary corner agent
@@ -849,6 +850,10 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    velocity.append(velocity_ai)
                    force.append(force_ai)
                    elastic_energy.append(ai.getVariableFloat("elastic_energy"))
+                   temp = ai.getVariableArrayFloat("concentration_multi")
+                   print("###################################################################")
+                   print(temp)
+                   print("###################################################################")
                    concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
                 print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
                 with open(str(file_path), 'w') as file:
@@ -1016,13 +1021,15 @@ model.addStepFunctionCallback(mb)
 # Layer #1: location of agents
 model.newLayer("L1").addAgentFunction("ECM", "ecm_output_grid_location_data");
 model.Layer("L1").addAgentFunction("BCORNER", "bcorner_output_location_data");
-model.Layer("L1").addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
+if INCLUDE_VASCULARIZATION:
+    model.Layer("L1").addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
 # Layer #2
 model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
 # Layer #3
 model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
 # Layer #4
-model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
+if INCLUDE_VASCULARIZATION:
+    model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
 # Layer #5
 model.newLayer("L5").addAgentFunction("ECM", "ecm_ecm_interaction");
 # Layer #6
@@ -1030,7 +1037,8 @@ model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditio
 # Layer #7: movement of agents
 model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
 model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
-model.Layer("L7").addAgentFunction("VASCULARIZATION", "vascularization_move");
+if INCLUDE_VASCULARIZATION:
+    model.Layer("L7").addAgentFunction("VASCULARIZATION", "vascularization_move");
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
@@ -1125,10 +1133,11 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
     square_bcorner_agt.setModel(pyflamegpu.CUBE);
     square_bcorner_agt.setModelScale(0.05);
     square_bcorner_agt.setColor(pyflamegpu.RED);
-    square_vascularization_agt = visualisation.addAgent("VASCULARIZATION");
-    square_vascularization_agt.setModel(pyflamegpu.CUBE);
-    square_vascularization_agt.setModelScale(0.035);
-    square_vascularization_agt.setColor(pyflamegpu.BLUE);
+    if INCLUDE_VASCULARIZATION:
+        square_vascularization_agt = visualisation.addAgent("VASCULARIZATION");
+        square_vascularization_agt.setModel(pyflamegpu.CUBE);
+        square_vascularization_agt.setModelScale(0.035);
+        square_vascularization_agt.setColor(pyflamegpu.BLUE);
 
     pen = visualisation.newLineSketch(1, 1, 1, 0.8); 
     pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);

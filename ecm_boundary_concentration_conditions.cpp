@@ -57,7 +57,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
   for (int i = 0; i < N_SPECIES; i++) { // loop through the species
 	  float max_conc = 0.0;             // if an agent is touching several boundaries, the maximum concentration is considered
 	  for (int j = 0; j < 6; j++) {     // loop through the 6 boundaries
-		if ((id == 9) && (DEBUG_PRINTING == 1)){ 				    // print first agent for debugging
+		if ((id == 9)){ 				    // print first agent for debugging
 			printf("species id: %d, boundary: [%d] , initial conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_INIT_MULTI[i][j]);
 			printf("species id: %d, boundary: [%d] , fixed conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_FIXED_MULTI[i][j]);
 		}		
@@ -78,6 +78,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
   
   for (int i = 0; i < N_SPECIES; i++) {
 	  FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
+	  //printf("agent id: %d, species id: %d, conc -> %2.6f  \n", id, i+1, agent_conc_multi[i]);
   }
   
   return flamegpu::ALIVE;
