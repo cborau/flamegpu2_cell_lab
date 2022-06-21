@@ -134,7 +134,7 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
-INIT_VASCULZARIZATION_CONCENTRATION_VALS = [1.0, 0.5]             # initial concentration of each species on the VASCULARIZATION agents
+INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, 0.5]              # initial concentration of each species on the VASCULARIZATION agents
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -568,16 +568,32 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     # VASCULARIZATION
     # TODO: read from file?
     # For now, manual initialization
-    for i in range(agents_per_dir[1]+1):
+    current_id += count + 1;
+    count = -1;
+    vasc_coords = np.genfromtxt('vascularization_points.txt',delimiter =' ');
+    print(vasc_coords)
+    for i in range(len(vasc_coords)):
+        count += 1;
         instance = FLAMEGPU.agent("VASCULARIZATION").newAgent();
         instance.setVariableInt("id", current_id+count);
-        instance.setVariableFloat("x", 0.0);
-        instance.setVariableFloat("y", ((i) * 1.0 / agents_per_dir[1]) - 0.5);
-        instance.setVariableFloat("z", 0.0);
+        instance.setVariableFloat("x", vasc_coords[i][0]);
+        instance.setVariableFloat("y", vasc_coords[i][1]);
+        instance.setVariableFloat("z", vasc_coords[i][2]);
         instance.setVariableFloat("vx", 0.0);
         instance.setVariableFloat("vy", 0.0);
         instance.setVariableFloat("vz", 0.0);
-        instance.setVariableArrayFloat("concentration_multi", INIT_VASCULZARIZATION_CONCENTRATION_VALS)
+        instance.setVariableArrayFloat("concentration_multi", INIT_VASCULARIZATION_CONCENTRATION_VALS)
+    # for i in range(agents_per_dir[1]+1):
+        # count += 1;
+        # instance = FLAMEGPU.agent("VASCULARIZATION").newAgent();
+        # instance.setVariableInt("id", current_id+count);
+        # instance.setVariableFloat("x", 0.0);
+        # instance.setVariableFloat("y", ((i) * 1.0 / agents_per_dir[1]) - 0.5);
+        # instance.setVariableFloat("z", 0.0);
+        # instance.setVariableFloat("vx", 0.0);
+        # instance.setVariableFloat("vy", 0.0);
+        # instance.setVariableFloat("vz", 0.0);
+        # instance.setVariableArrayFloat("concentration_multi", INIT_VASCULARIZATION_CONCENTRATION_VALS)
         
 
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
