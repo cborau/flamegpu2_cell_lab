@@ -39,11 +39,12 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
   float min_distance = ECM_ECM_EQUILIBRIUM_DISTANCE; //initialize to maximum possible value between ECM agents
   int vessel_found = 0; // boolean to determine if at least one vascularization agent is close  
   
-  for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_x)) { // find the closest vascularization agent (if any)
+  for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_z)) { // find the closest vascularization agent (if any)
     message_id = message.getVariable<int>("id");
 	message_x = message.getVariable<float>("x");
     message_y = message.getVariable<float>("y");
     message_z = message.getVariable<float>("z");
+	
 	if (id == 14 || id == 24){
 		printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
 	}
