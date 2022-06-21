@@ -37,7 +37,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   // Agent concentration
   const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
-  float agent_conc_multi[N_SPECIES];
+  float agent_conc_multi[N_SPECIES] = {}; 
   for (int i = 0; i < N_SPECIES; i++) {
 	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
   }
@@ -62,7 +62,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float message_x = 0.0;
   float message_y = 0.0;
   float message_z = 0.0;
-  float message_conc_multi[N_SPECIES]; //initialize values to 0.0
+  float message_conc_multi[N_SPECIES] = {}; //initialize values to 0.0
   int message_id = 0;
   float message_vx = 0.0;
   float message_vy = 0.0;
@@ -117,12 +117,12 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float n_back_dist = 0.0; 
 
   // Concentration and distance data of Neuman neighbourhood. Needed to solve diffusion equation for multiple species
-  float n_up_conc_multi[N_SPECIES]; // concentration of agent on top of current one
-  float n_down_conc_multi[N_SPECIES];
-  float n_right_conc_multi[N_SPECIES]; 
-  float n_left_conc_multi[N_SPECIES]; 
-  float n_front_conc_multi[N_SPECIES]; 
-  float n_back_conc_multi[N_SPECIES]; 
+  float n_up_conc_multi[N_SPECIES] = {};  // concentration of agent on top of current one
+  float n_down_conc_multi[N_SPECIES] = {}; 
+  float n_right_conc_multi[N_SPECIES] = {};  
+  float n_left_conc_multi[N_SPECIES] = {};  
+  float n_front_conc_multi[N_SPECIES] = {};  
+  float n_back_conc_multi[N_SPECIES] = {};  
   
 
   //printf("Interaction agent %d [%d %d %d]\n", id, agent_grid_i, agent_grid_j, agent_grid_k);
@@ -269,7 +269,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float dz = ((n_up_dist > 0.0) & (n_down_dist > 0.0)) ? (n_up_dist + n_down_dist) / 2.0 : fmaxf(n_up_dist,n_down_dist);
   
   //Apply diffusion equation for multiple species
-  float agent_conc_prev_multi[N_SPECIES];
+  float agent_conc_prev_multi[N_SPECIES] = {}; 
   for (int i = 0; i < N_SPECIES; i++) {
 	float DIFFUSION_COEFF = FLAMEGPU->environment.getProperty<float>("DIFFUSION_COEFF_MULTI",i);
 	float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);

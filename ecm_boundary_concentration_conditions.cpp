@@ -9,7 +9,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
     
   // Agent concentration
   const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
-  float agent_conc_multi[N_SPECIES];
+  float agent_conc_multi[N_SPECIES] = {}; 
   for (int i = 0; i < N_SPECIES; i++) {
     agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
   }
@@ -60,8 +60,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_boundary_concentration_conditions, flamegpu::Message
     max_conc = 0.0;             // if an agent is touching several boundaries, the maximum concentration is considered
     for (int j = 0; j < 6; j++) {     // loop through the 6 boundaries
       if ((id == 9) && (DEBUG_PRINTING == 1)){             // print first agent for debugging
-        printf("species id: %d, boundary: [%d] , initial conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_INIT_MULTI[i][j]);
-        printf("species id: %d, boundary: [%d] , fixed conc -> %2.6f  \n", i+1, j+1, (float)BOUNDARY_CONC_FIXED_MULTI[i][j]);
+        printf("species id: %d, boundary: [%d] , initial conc -> %g  \n", i+1, j+1, (float)BOUNDARY_CONC_INIT_MULTI[i][j]);
+        printf("species id: %d, boundary: [%d] , fixed conc -> %g  \n", i+1, j+1, (float)BOUNDARY_CONC_FIXED_MULTI[i][j]);
       }    
       if (fabsf(separations[j]) < (ECM_BOUNDARY_INTERACTION_RADIUS)){
         touching_boundary = 1;

@@ -15,7 +15,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
  
   // Agent concentration
   const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
-  float agent_conc_multi[N_SPECIES];
+  float agent_conc_multi[N_SPECIES] = {}; 
   for (int i = 0; i < N_SPECIES; i++) {
 	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
   }
@@ -28,7 +28,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
   float message_x = 0.0;
   float message_y = 0.0;
   float message_z = 0.0;
-  float message_conc_multi[N_SPECIES]; //initialize values to 0.0
+  float message_conc_multi[N_SPECIES] = {};  //initialize values to 0.0
   
   // direction: the vector joining interacting agents
   float dir_x = 0.0; 
@@ -38,7 +38,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
   
   float min_distance = ECM_ECM_EQUILIBRIUM_DISTANCE; //initialize to maximum possible value between ECM agents
   int vessel_found = 0; // boolean to determine if at least one vascularization agent is close  
-  printf("ECM-VASCULARIZATION agent %d ->  xyz = %2.6f, %2.6f, %2.6f \n", id, agent_x, agent_y, agent_z);
+  //printf("ECM-VASCULARIZATION agent %d ->  xyz = %g, %g, %g \n", id, agent_x, agent_y, agent_z);
   
   for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_z)) { // find the closest vascularization agent (if any)
     message_id = message.getVariable<int>("id");
@@ -46,10 +46,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
     message_y = message.getVariable<float>("y");
     message_z = message.getVariable<float>("z");
 	//printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
-	if (id == 14 || id == 24){
-		printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
-	}
-    
+	    
     dir_x = agent_x - message_x; 
     dir_y = agent_y - message_y; 
     dir_z = agent_z - message_z; 
@@ -57,11 +54,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
                
     if (distance < min_distance) {
 		vessel_found = 1;		
-		min_distance = distance;
-		if (id == 14 || id == 24){
-			printf("agent %d -> message (%d) distance = %2.6f \n", id, message_id, distance);
-		}
-		printf("agent %d -> message (%d) distance = %2.6f \n", id, message_id, distance);
+		min_distance = distance;		
+		//printf("agent %d -> message (%d) distance = %2.6f \n", id, message_id, distance);
 		for (int i = 0; i < N_SPECIES; i++) {
 			message_conc_multi[i] = message.getVariable<float, N_SPECIES>("concentration_multi", i);
 		}	  
@@ -71,20 +65,14 @@ FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatia
   if (vessel_found == 1){ // at least one vascularization agent is close
 	    for (int i = 0; i < N_SPECIES; i++) {
 			if (agent_conc_multi[i] < message_conc_multi[i]){
-				if (id == 14 || id == 24){
-					printf("agent %d -> min_distance = %2.6f, own conc before = %2.6f \n", id, min_distance, agent_conc_multi[i]);
-				}
-				
+								
 				agent_conc_multi[i] += (1.0 - (min_distance / ECM_ECM_EQUILIBRIUM_DISTANCE)) * (message_conc_multi[i] - agent_conc_multi[i]) * DELTA_TIME;
 				
 				if (agent_conc_multi[i] > 1.0){
 					agent_conc_multi[i] = 1.0; // this should never happen
 					printf("WARNING: agent %d achieved concentration above 1.0. Check equations \n",id);
-				}
+				}			
 				
-				if (id == 14 || id == 24){
-					printf("agent %d -> vasc_conc = %2.6f, own conc after = %2.6f \n", id, message_conc_multi[i] , agent_conc_multi[i]);
-				}
 				FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
 			}			
 		}

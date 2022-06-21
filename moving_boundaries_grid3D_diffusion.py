@@ -74,7 +74,7 @@ EPSILON = 0.0000000001;
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 6;
+N = 10;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
@@ -134,9 +134,10 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
-INCLUDE_VASCULARIZATION = False;                                   # if True, vascularization is taken into account     
-INIT_VASCULARIZATION_CONCENTRATION_VALS = [-1.0, -0.5]              # initial concentration of each species on the VASCULARIZATION agents
+INCLUDE_VASCULARIZATION = True;                                   # if True, vascularization is taken into account     
+INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, 0.5]              # initial concentration of each species on the VASCULARIZATION agents
 N_VASCULARIZATION_POINTS = 0;                                     # declared here. Points are loaded from file
+VASCULARIZATION_POINTS_COORDS = None;                             # declared here. Coords loaded from file
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -244,6 +245,7 @@ env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
 # Number of diffusing species
 env.newPropertyUInt("N_SPECIES", N_SPECIES);
+env.newPropertyUInt("N_VASCULARIZATION_POINTS", N_VASCULARIZATION_POINTS);
 
 # ------------------------------------------------------
 # ECM BEHAVIOUR 
@@ -426,7 +428,7 @@ ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunctionCallback):
   def run(self,FLAMEGPU):
-    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS
+    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -573,25 +575,25 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     if INCLUDE_VASCULARIZATION:
         current_id += count + 1;
         count = -1;
-        vasc_coords = np.genfromtxt('vascularization_points.txt',delimiter =' ');
-        #print(vasc_coords)
-        N_VASCULARIZATION_POINTS = len(vasc_coords);
+        VASCULARIZATION_POINTS_COORDS = np.genfromtxt('vascularization_points.txt',delimiter =' ');
+        #print(VASCULARIZATION_POINTS_COORDS)
+        N_VASCULARIZATION_POINTS = len(VASCULARIZATION_POINTS_COORDS);
         for i in range(N_VASCULARIZATION_POINTS):
             count += 1;
             instance = FLAMEGPU.agent("VASCULARIZATION").newAgent();
             instance.setVariableInt("id", current_id+count);
-            # instance.setVariableFloat("x", vasc_coords[i][0]);
-            # instance.setVariableFloat("y", vasc_coords[i][1]);
-            # instance.setVariableFloat("z", vasc_coords[i][2]);
+            # instance.setVariableFloat("x", VASCULARIZATION_POINTS_COORDS[i][0]);
+            # instance.setVariableFloat("y", VASCULARIZATION_POINTS_COORDS[i][1]);
+            # instance.setVariableFloat("z", VASCULARIZATION_POINTS_COORDS[i][2]);
             instance.setVariableFloat("x", -0.25);
-            instance.setVariableFloat("y", vasc_coords[i][1]);
+            instance.setVariableFloat("y", VASCULARIZATION_POINTS_COORDS[i][1]);
             instance.setVariableFloat("z", 0.0);
             instance.setVariableFloat("vx", 0.0);
             instance.setVariableFloat("vy", 0.0);
             instance.setVariableFloat("vz", 0.0);
             instance.setVariableArrayFloat("concentration_multi", INIT_VASCULARIZATION_CONCENTRATION_VALS)
            
-
+    FLAMEGPU.environment.setPropertyUInt("N_VASCULARIZATION_POINTS", N_VASCULARIZATION_POINTS)
     FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
     return
     
@@ -793,25 +795,34 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
         self.vascularizationdata.append("# vtk DataFile Version 3.0")
         self.vascularizationdata.append("Vascularization points")
         self.vascularizationdata.append("ASCII") 
-        self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")
-        self.vascularizationdata.append("POINTS {} float".format(N_VASCULARIZATION_POINTS)) #number of vascularization agents 
-
+        self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")        
         
  
     def run(self, FLAMEGPU):
         global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
         global RES_PATH        
-        global stepCounter, fileCounter, BOUNDARY_COORDS
+        global stepCounter, fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
 
         if SAVE_DATA_TO_FILE:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 
-                file_name = 'ecm_data_t{:03d}.vtk'.format(stepCounter)
-                file_path = RES_PATH / file_name
-            
-            
-            
-                file_name = 'ecm_data_t{:03d}.vtk'.format(stepCounter)
+                if INCLUDE_VASCULARIZATION:
+                    vasc_coords = list()
+                    file_name = 'vascularization_points_t{:04d}.vtk'.format(stepCounter)
+                    file_path = RES_PATH / file_name
+                    vasc_agent = FLAMEGPU.agent("VASCULARIZATION");
+                    av = vasc_agent.getPopulationData(); # this returns a DeviceAgentVector 
+                    for ai in av:
+                       coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
+                       vasc_coords.append(coords_ai)
+                    with open(str(file_path), 'w') as file:
+                        for line in self.vascularizationdata:
+                            file.write(line  + '\n') 
+                        file.write("POINTS {} float \n".format(FLAMEGPU.environment.getPropertyUInt("N_VASCULARIZATION_POINTS"))) #number of vascularization agents                            
+                        for coords_ai in vasc_coords:
+                            file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
+                 
+                file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
                 file_path = RES_PATH / file_name
                 agent = FLAMEGPU.agent("ECM");
                 # reaction forces, thus, opposite to agent-applied forces
@@ -848,10 +859,6 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    velocity.append(velocity_ai)
                    force.append(force_ai)
                    elastic_energy.append(ai.getVariableFloat("elastic_energy"))
-                   temp = ai.getVariableArrayFloat("concentration_multi")
-                   print("###################################################################")
-                   print(temp)
-                   print("###################################################################")
                    concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
                 print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
                 with open(str(file_path), 'w') as file:
