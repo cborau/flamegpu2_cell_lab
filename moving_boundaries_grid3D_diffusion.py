@@ -74,7 +74,7 @@ EPSILON = 0.0000000001;
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 10;
+N = 6;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
@@ -570,8 +570,6 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableUInt8("grid_k", k);
                 
     # VASCULARIZATION
-    # TODO: read from file?
-    # For now, manual initialization
     if INCLUDE_VASCULARIZATION:
         current_id += count + 1;
         count = -1;
