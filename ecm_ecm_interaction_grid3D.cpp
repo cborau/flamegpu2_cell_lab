@@ -62,7 +62,6 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float message_x = 0.0;
   float message_y = 0.0;
   float message_z = 0.0;
-  float message_conc = 0.0;
   float message_conc_multi[N_SPECIES]; //initialize values to 0.0
   int message_id = 0;
   float message_vx = 0.0;

@@ -1,119 +1,77 @@
+FLAMEGPU_DEVICE_FUNCTION float vec3Length(const float x, const float y, const float z) {
+  return sqrtf(x * x + y * y + z * z);
+}
+
 FLAMEGPU_AGENT_FUNCTION(ecm_vascularization_interaction, flamegpu::MessageSpatial3D, flamegpu::MessageNone) {
   // Agent properties in local register
   int id = FLAMEGPU->getVariable<int>("id");
   
-  //TODO: COPY ECM_ECM_INTERACTION FROM OLD VERSION (SPATIAL3D)
 
   // Agent position
   float agent_x = FLAMEGPU->getVariable<float>("x");
   float agent_y = FLAMEGPU->getVariable<float>("y");
   float agent_z = FLAMEGPU->getVariable<float>("z");
   
-  // Agent velocity
-  float agent_vx = FLAMEGPU->getVariable<float>("vx");
-  float agent_vy = FLAMEGPU->getVariable<float>("vy");
-  float agent_vz = FLAMEGPU->getVariable<float>("vz");
+ 
+  // Agent concentration
+  const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
+  float agent_conc_multi[N_SPECIES];
+  for (int i = 0; i < N_SPECIES; i++) {
+	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
+  }
   
-  // Elastinc constant of the ecm 
-  //const float k_elast = FLAMEGPU->getVariable<float>("k_elast");
-  //float k_elast = 0.0;
-  
-  // Dumping constant of the ecm 
-  //const float d_dumping = FLAMEGPU->getVariable<float>("d_dumping");
-  //float d_dumping = 0.0;
-  
-  //Interaction with boundaries
-  float boundary_fx = 0.0;
-  float boundary_fy = 0.0;
-  float boundary_fz = 0.0;
-  float separation_x_pos = 0.0;
-  float separation_x_neg = 0.0;
-  float separation_y_pos = 0.0;
-  float separation_y_neg = 0.0;
-  float separation_z_pos = 0.0;
-  float separation_z_neg = 0.0;
-  const float ECM_BOUNDARY_INTERACTION_RADIUS = FLAMEGPU->environment.getProperty<float>("ECM_BOUNDARY_INTERACTION_RADIUS");
-  const float ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = FLAMEGPU->environment.getProperty<float>("ECM_BOUNDARY_EQUILIBRIUM_DISTANCE");
+  const float ECM_ECM_EQUILIBRIUM_DISTANCE = FLAMEGPU->environment.getProperty<float>("ECM_ECM_EQUILIBRIUM_DISTANCE");
+  const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
-
-  // Get position of the boundaries
-  const float COORD_BOUNDARY_X_POS = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",0);
-  const float COORD_BOUNDARY_X_NEG = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",1);
-  const float COORD_BOUNDARY_Y_POS = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",2);
-  const float COORD_BOUNDARY_Y_NEG = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",3);
-  const float COORD_BOUNDARY_Z_POS = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",4);
-  const float COORD_BOUNDARY_Z_NEG = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",5);
-
-  const float INIT_COORD_BOUNDARY_X_POS = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 0);
-  const float INIT_COORD_BOUNDARY_X_NEG = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 1);
-  const float INIT_COORD_BOUNDARY_Y_POS = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 2);
-  const float INIT_COORD_BOUNDARY_Y_NEG = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 3);
-  const float INIT_COORD_BOUNDARY_Z_POS = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 4);
-  const float INIT_COORD_BOUNDARY_Z_NEG = FLAMEGPU->environment.getProperty<float>("INIT_COORDS_BOUNDARIES", 5);
   
-  // Get displacement rate of the boundaries
-  const float DISP_RATE_BOUNDARY_X_POS = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",0);
-  const float DISP_RATE_BOUNDARY_X_NEG = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",1);
-  const float DISP_RATE_BOUNDARY_Y_POS = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",2);
-  const float DISP_RATE_BOUNDARY_Y_NEG = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",3);
-  const float DISP_RATE_BOUNDARY_Z_POS = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",4);
-  const float DISP_RATE_BOUNDARY_Z_NEG = FLAMEGPU->environment.getProperty<float>("DISP_RATES_BOUNDARIES",5);
-
-  // Get boundarY conditions
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_X_POS = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 0);
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_X_NEG = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 1);
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Y_POS = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 2);
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Y_NEG = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 3);
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Z_POS = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 4);
-  const int ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Z_NEG = FLAMEGPU->environment.getProperty<int>("ALLOW_BOUNDARY_ELASTIC_MOVEMENT", 5);
-
-  const float BOUNDARY_STIFFNESS_X_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 0);
-  const float BOUNDARY_STIFFNESS_X_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 1);
-  const float BOUNDARY_STIFFNESS_Y_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 2);
-  const float BOUNDARY_STIFFNESS_Y_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 3);
-  const float BOUNDARY_STIFFNESS_Z_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 4);
-  const float BOUNDARY_STIFFNESS_Z_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_STIFFNESS", 5);
-
-  const float BOUNDARY_DUMPING_X_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 0);
-  const float BOUNDARY_DUMPING_X_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 1);
-  const float BOUNDARY_DUMPING_Y_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 2);
-  const float BOUNDARY_DUMPING_Y_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 3);
-  const float BOUNDARY_DUMPING_Z_POS = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 4);
-  const float BOUNDARY_DUMPING_Z_NEG = FLAMEGPU->environment.getProperty<float>("BOUNDARY_DUMPING", 5);
-
-  // Check for ecm-boundary separations
-  //this takes into account the distance with respect to the actual boundary position, while forces are calculated with respect to boundary initial position
-  separation_x_pos = (agent_x - COORD_BOUNDARY_X_POS); 
-  separation_x_neg = (agent_x - COORD_BOUNDARY_X_NEG);
-  separation_y_pos = (agent_y - COORD_BOUNDARY_Y_POS);
-  separation_y_neg = (agent_y - COORD_BOUNDARY_Y_NEG);
-  separation_z_pos = (agent_z - COORD_BOUNDARY_Z_POS);
-  separation_z_neg = (agent_z - COORD_BOUNDARY_Z_NEG);
-
+  int message_id = 0;
+  float message_x = 0.0;
+  float message_y = 0.0;
+  float message_z = 0.0;
+  float message_conc_multi[N_SPECIES]; //initialize values to 0.0
+  
+  // direction: the vector joining interacting agents
+  float dir_x = 0.0; 
+  float dir_y = 0.0; 
+  float dir_z = 0.0; 
+  float distance = 0.0;
+  
+  float min_distance = ECM_ECM_EQUILIBRIUM_DISTANCE; //initialize to maximum possible value between ECM agents
     
+  
+  for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_x)) { // find the closest vascularization agent (if any)
+    message_id = message.getVariable<int>("id");
+	message_x = message.getVariable<float>("x");
+    message_y = message.getVariable<float>("y");
+    message_z = message.getVariable<float>("z");
+    
+    dir_x = agent_x - message_x; 
+    dir_y = agent_y - message_y; 
+    dir_z = agent_z - message_z; 
+    distance = vec3Length(dir_x, dir_y, dir_z);      
+               
+    if (distance < ECM_ECM_EQUILIBRIUM_DISTANCE) {		
+		if (distance < min_distance){
+			min_distance = distance;
+			for (int i = 0; i < N_SPECIES; i++) {
+				message_conc_multi[i] = message.getVariable<float, N_SPECIES>("concentration_multi", i);
+			}	
+		}   
+    }
+  }
+  
+  if (min_distance < ECM_ECM_EQUILIBRIUM_DISTANCE){ // at least one vascularization agent is close
+	    for (int i = 0; i < N_SPECIES; i++) {
+			if (agent_conc_multi[i] < message_conc_multi[i]){
+				// printf("agent %d -> min_distance = %2.6f, own conc before = %2.6f \n", id, min_distance, agent_conc_multi[i]);
+				agent_conc_multi[i] += (1.0 - (min_distance / ECM_ECM_EQUILIBRIUM_DISTANCE)) * (message_conc_multi[i] - agent_conc_multi[i]) * DELTA_TIME;
+				// printf("agent %d -> vasc_conc = %2.6f, own conc after = %2.6f \n", id, message_conc_multi[i] , agent_conc_multi[i]);
+				FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
+			}			
+		}
+  }
 
-  if (fabsf(separation_x_pos) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_x_pos) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_X_POS > 0){
-      boundary_fx += -1 * (agent_x - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_X_POS) * (BOUNDARY_STIFFNESS_X_POS) - BOUNDARY_DUMPING_X_POS * (agent_vx - DISP_RATE_BOUNDARY_X_POS);
-  }
-  if (fabsf(separation_x_neg) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_x_neg) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_X_NEG > 0){
-      boundary_fx +=  -1* (agent_x - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_X_NEG) * (BOUNDARY_STIFFNESS_X_NEG) - BOUNDARY_DUMPING_X_NEG * (agent_vx - DISP_RATE_BOUNDARY_X_NEG);
-  }
-  if (fabsf(separation_y_pos) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_y_pos) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Y_POS > 0) {
-      boundary_fy += -1 * (agent_y - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_Y_POS) * (BOUNDARY_STIFFNESS_Y_POS) - BOUNDARY_DUMPING_Y_POS * (agent_vy - DISP_RATE_BOUNDARY_Y_POS);
-  }
-  if (fabsf(separation_y_neg) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_y_neg) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Y_NEG > 0) {
-      boundary_fy +=  -1* (agent_y - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_Y_NEG) * (BOUNDARY_STIFFNESS_Y_NEG) - BOUNDARY_DUMPING_Y_NEG * (agent_vy - DISP_RATE_BOUNDARY_Y_NEG);
-  }
-  if (fabsf(separation_z_pos) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_z_pos) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Z_POS > 0) {
-      boundary_fz += -1 * (agent_z - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_Z_POS) * (BOUNDARY_STIFFNESS_Z_POS) - BOUNDARY_DUMPING_Z_POS * (agent_vz - DISP_RATE_BOUNDARY_Z_POS);
-  }
-  if (fabsf(separation_z_neg) < (ECM_BOUNDARY_INTERACTION_RADIUS) && fabsf(separation_z_neg) > EPSILON && ALLOW_BOUNDARY_ELASTIC_MOVEMENT_Z_NEG > 0) {
-      boundary_fz +=  -1* (agent_z - ECM_BOUNDARY_EQUILIBRIUM_DISTANCE - INIT_COORD_BOUNDARY_Z_NEG) * (BOUNDARY_STIFFNESS_Z_NEG) - BOUNDARY_DUMPING_Z_NEG * (agent_vz - DISP_RATE_BOUNDARY_Z_NEG);
-  }
 
-  FLAMEGPU->setVariable<float>("boundary_fx", boundary_fx);
-  FLAMEGPU->setVariable<float>("boundary_fy", boundary_fy);
-  FLAMEGPU->setVariable<float>("boundary_fz", boundary_fz);
 
   return flamegpu::ALIVE;
 }

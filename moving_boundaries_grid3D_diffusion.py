@@ -69,20 +69,19 @@ SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes s
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
-MAX_SEARCH_RADIUS = 2.0;      # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
 EPSILON = 0.0000000001;
 
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 4;
+N = 10;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 50;
+STEPS = 10;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -109,6 +108,8 @@ print("ECM_ECM_EQUILIBRIUM_DISTANCE: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
+MAX_SEARCH_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
+
 OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
 OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
@@ -126,11 +127,11 @@ if OSCILLATORY_SHEAR_ASSAY:
 #+--------------------------------------------------------------------+
 N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp, ecm_boundary_concentration_conditions.cpp, ecm_ecm_interaction_grid3D.cpp
 DIFFUSION_COEFF_MULTI = [0.02,0.02]                               # diffusion coefficient in [units^2/s] per specie
-BOUNDARY_CONC_INIT_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
-                            [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]]  # add as many lines as different species
+BOUNDARY_CONC_INIT_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
+                            [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]]  # add as many lines as different species
                             
-BOUNDARY_CONC_FIXED_MULTI = [[-1.0, 1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
-                             [-1.0, -1.0, 1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
+BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentration boundary conditions at each surface. WARNING: -1.0 means initial condition prevails. Don't use 0.0 as initial condition if that value is not fixed. Use -1.0 instead
+                             [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
 INIT_VASCULZARIZATION_CONCENTRATION_VALS = [1.0, 0.5]             # initial concentration of each species on the VASCULARIZATION agents
@@ -213,6 +214,7 @@ ecm_output_location_data_file = "ecm_output_location_data.cpp";
 ecm_output_grid_location_data_file = "ecm_output_grid_location_data.cpp";
 ecm_boundary_interaction_file = "ecm_boundary_interaction.cpp";
 ecm_ecm_interaction_file = "ecm_ecm_interaction_grid3D.cpp";
+ecm_vascularization_interaction_file = "ecm_vascularization_interaction.cpp";
 ecm_boundary_concentration_conditions_file = "ecm_boundary_concentration_conditions.cpp";
 
 """
@@ -298,7 +300,7 @@ bcorner_location_message.newVariableInt("id");
 
 vascularization_location_message = model.newMessageSpatial3D("vascularization_location_message");
 # Set the range and bounds.
-vascularization_location_message.setRadius(MAX_SEARCH_RADIUS); 
+vascularization_location_message.setRadius(MAX_SEARCH_RADIUS); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
 vascularization_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
 vascularization_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
 vascularization_location_message.newVariableInt("id");
@@ -336,8 +338,7 @@ vascularization_agent.newVariableFloat("z");
 vascularization_agent.newVariableFloat("vx");
 vascularization_agent.newVariableFloat("vy");
 vascularization_agent.newVariableFloat("vz");
-vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES)
-
+vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES);
 vascularization_agent.newRTCFunctionFile("vascularization_output_location_data", vascularization_output_location_data_file).setMessageOutput("vascularization_location_message");
 vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file);
 
@@ -994,13 +995,15 @@ model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
 # Layer #3
 model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
 # Layer #4
-model.newLayer("L4").addAgentFunction("ECM", "ecm_ecm_interaction");
+model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
 # Layer #5
-model.newLayer("L5").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
-# Layer #6: movement of agents
-model.newLayer("L6").addAgentFunction("ECM", "ecm_move");
-model.Layer("L6").addAgentFunction("BCORNER", "bcorner_move");
-model.Layer("L6").addAgentFunction("VASCULARIZATION", "vascularization_move");
+model.newLayer("L5").addAgentFunction("ECM", "ecm_ecm_interaction");
+# Layer #6
+model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
+# Layer #7: movement of agents
+model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
+model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
+model.Layer("L7").addAgentFunction("VASCULARIZATION", "vascularization_move");
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
