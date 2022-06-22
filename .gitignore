@@ -2,3 +2,7 @@
 *.vtk
 *.mp4
 summary_plots.py
+*.pvsm
+moving_boundaries_grid3D_diffusion_old.py
+vascularization_points_line.txt
+vascularization_points_minitest.txt

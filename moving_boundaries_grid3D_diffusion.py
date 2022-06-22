@@ -81,7 +81,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 50;
+STEPS = 100;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -89,7 +89,7 @@ ECM_K_ELAST = 1.0;       #[N/units/kg]
 ECM_D_DUMPING = 1.0;     #[N*s/units/kg]
 ECM_MASS = 1.0;          #[dimensionless to make K and D mass dependent]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.02, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
@@ -99,7 +99,7 @@ BOUNDARY_STIFFNESS_VALUE = 1.0 # N/units
 BOUNDARY_DUMPING_VALUE = 0.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
-CLAMP_AGENT_TOUCHING_BOUNDARY = [1, 1, 1, 1, 1, 1]; #+X,-X,+Y,-Y,+Z,-Z [bool]
+CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
 ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 #ECM_ECM_INTERACTION_RADIUS = 100;
 #ECM_ECM_EQUILIBRIUM_DISTANCE = 0.45;
@@ -135,7 +135,7 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
 INCLUDE_VASCULARIZATION = True;                                   # if True, vascularization is taken into account     
-INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, 0.5]              # initial concentration of each species on the VASCULARIZATION agents
+INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, -1.0]              # initial concentration of each species on the VASCULARIZATION agents
 N_VASCULARIZATION_POINTS = 0;                                     # declared here. Points are loaded from file
 VASCULARIZATION_POINTS_COORDS = None;                             # declared here. Coords loaded from file
 
@@ -213,7 +213,6 @@ bcorner_move_file = "bcorner_move.cpp";
 """
   ECM
 """
-ecm_output_location_data_file = "ecm_output_location_data.cpp";
 ecm_output_grid_location_data_file = "ecm_output_grid_location_data.cpp";
 ecm_boundary_interaction_file = "ecm_boundary_interaction.cpp";
 ecm_ecm_interaction_file = "ecm_ecm_interaction_grid3D.cpp";
@@ -345,7 +344,7 @@ if INCLUDE_VASCULARIZATION:
     vascularization_agent.newVariableFloat("vz");
     vascularization_agent.newVariableArrayFloat("concentration_multi", N_SPECIES);
     vascularization_agent.newRTCFunctionFile("vascularization_output_location_data", vascularization_output_location_data_file).setMessageOutput("vascularization_location_message");
-    vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file);
+    vascularization_agent.newRTCFunctionFile("vascularization_move", vascularization_move_file).setMessageInput("ecm_grid_location_message");
 
 """
   Boundary corner agent
@@ -412,7 +411,6 @@ ecm_agent.newVariableUInt8("grid_i");
 ecm_agent.newVariableUInt8("grid_j");
 ecm_agent.newVariableUInt8("grid_k");
 
-#ecm_agent.newRTCFunctionFile("ecm_output_location_data", ecm_output_location_data_file).setMessageOutput("ecm_location_message");
 ecm_agent.newRTCFunctionFile("ecm_output_grid_location_data", ecm_output_grid_location_data_file).setMessageOutput("ecm_grid_location_message");
 ecm_agent.newRTCFunctionFile("ecm_boundary_interaction", ecm_boundary_interaction_file);
 ecm_agent.newRTCFunctionFile("ecm_ecm_interaction", ecm_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
@@ -508,11 +506,11 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     coords_x = np.linspace(BOUNDARY_COORDS[1] + offset[1], BOUNDARY_COORDS[0] - offset[0], agents_per_dir[0]);
     coords_y = np.linspace(BOUNDARY_COORDS[3] + offset[3], BOUNDARY_COORDS[2] - offset[2], agents_per_dir[1]);
     coords_z = np.linspace(BOUNDARY_COORDS[5] + offset[5], BOUNDARY_COORDS[4] - offset[4], agents_per_dir[2]);
-    print(coords_x);
     count = -1;
     i = -1;
     j = -1;
-    k = -1;
+    k = -1;  
+    
     for x in coords_x: 
         i += 1;
         j = -1;
@@ -582,12 +580,12 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
             count += 1;
             instance = FLAMEGPU.agent("VASCULARIZATION").newAgent();
             instance.setVariableInt("id", current_id+count);
-            # instance.setVariableFloat("x", VASCULARIZATION_POINTS_COORDS[i][0]);
-            # instance.setVariableFloat("y", VASCULARIZATION_POINTS_COORDS[i][1]);
-            # instance.setVariableFloat("z", VASCULARIZATION_POINTS_COORDS[i][2]);
-            instance.setVariableFloat("x", -0.25);
+            instance.setVariableFloat("x", VASCULARIZATION_POINTS_COORDS[i][0]);
             instance.setVariableFloat("y", VASCULARIZATION_POINTS_COORDS[i][1]);
-            instance.setVariableFloat("z", 0.0);
+            instance.setVariableFloat("z", VASCULARIZATION_POINTS_COORDS[i][2]);
+            # instance.setVariableFloat("x", -0.25);
+            # instance.setVariableFloat("y", VASCULARIZATION_POINTS_COORDS[i][1]);
+            # instance.setVariableFloat("z", 0.0);
             instance.setVariableFloat("vx", 0.0);
             instance.setVariableFloat("vy", 0.0);
             instance.setVariableFloat("vz", 0.0);
@@ -1043,7 +1041,7 @@ model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditio
 model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
 model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
 if INCLUDE_VASCULARIZATION:
-    model.Layer("L7").addAgentFunction("VASCULARIZATION", "vascularization_move");
+    model.newLayer("L8").addAgentFunction("VASCULARIZATION", "vascularization_move");
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
