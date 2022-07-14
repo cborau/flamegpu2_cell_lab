@@ -15,6 +15,25 @@ FLAMEGPU_DEVICE_FUNCTION void vec3Normalize(float &x, float &y, float &z) {
   float length = vec3Length(x, y, z);
   vec3Div(x, y, z, length);
 }
+FLAMEGPU_DEVICE_FUNCTION float getAngleBetweenVec(const float x1, const float y1, const float z1, const float x2, const float y2, const float z2) {
+  float dot_dir = x1 * x2 + y1 * y2 + z1 * z2;
+  float cross_x_dir = 0.0;
+  float cross_y_dir = 0.0;
+  float cross_z_dir = 0.0;
+  float angle = 0.0;
+  float EPSILON = 0.0000000001;
+  vec3CrossProd(cross_x_dir, cross_y_dir, cross_z_dir, x1, y1, z1, x2, y2, z2);
+  float det_dir = vec3Length(cross_x_dir, cross_y_dir, cross_z_dir);
+  if (fabsf(dot_dir) > EPSILON) {
+    angle = atan2f(det_dir, dot_dir);
+  }
+  else {
+    angle = 0.0;
+  }
+  
+  return angle;
+}
+
 
 FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu::MessageNone) {
   // Agent properties in local register
@@ -42,8 +61,14 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	 agent_conc_multi[i] = FLAMEGPU->getVariable<float, N_SPECIES>("concentration_multi", i);
   }
   
-  // Elastinc constant of the ecm 
-  const float k_elast = FLAMEGPU->getVariable<float>("k_elast");
+  // Elastic constant of the ecm 
+  //const float k_elast = FLAMEGPU->getVariable<float>("k_elast");
+  float k_elast = 0.0; //Equivalent elastic constant of two springs in series (agent and message)
+  // Elastic constant and orientation of the fibers
+  float agent_k_elast = FLAMEGPU->getVariable<float>("k_elast");
+  float agent_orx = FLAMEGPU->getVariable<float>("orx");
+  float agent_ory = FLAMEGPU->getVariable<float>("ory");
+  float agent_orz = FLAMEGPU->getVariable<float>("orz");
   
   // Dumping constant of the ecm 
   const float d_dumping = FLAMEGPU->getVariable<float>("d_dumping");
@@ -58,6 +83,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float agent_f_extension = 0.0;
   float agent_f_compression = 0.0;
   float agent_elastic_energy = 0.0;
+
   
   float message_x = 0.0;
   float message_y = 0.0;
@@ -70,16 +96,14 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   uint8_t message_grid_i = 0;
   uint8_t message_grid_j = 0;
   uint8_t message_grid_k = 0;
+  // Elastic constant and orientation of the message agent
+  float message_k_elast = 0.0;
+  float message_orx = 0.0;
+  float message_ory = 0.0;
+  float message_orz = 0.0;
 
   // Initialize other variables
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
-  // cross product between agent-message velocity vectors and vector joining agents (direction)
-  float cross_agent_vx_dir = 0.0;
-  float cross_agent_vy_dir = 0.0;
-  float cross_agent_vz_dir = 0.0;
-  float cross_message_vx_dir = 0.0;
-  float cross_message_vy_dir = 0.0;
-  float cross_message_vz_dir = 0.0;
   // direction: the vector joining interacting agents
   float dir_x = 0.0; 
   float dir_y = 0.0; 
@@ -89,12 +113,13 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float cos_x = 0.0;
   float cos_y = 0.0;
   float cos_z = 0.0;
-  // dot product, determinant and angle (in radians) between agent velocity vector and direction vector
-  float dot_agent_v_dir = 0.0;
-  float det_agent_v_dir = 0.0;
+   // angle (in radians) between agent orientation vector and direction vector
+  float angle_agent_ori_dir = 0.0;
+  float angle_message_ori_dir = 0.0;
+  float cos_ori_agent = 0.0;
+  float cos_ori_message = 0.0;
+  // angle (in radians) between agent velocity vector and direction vector
   float angle_agent_v_dir = 0.0;
-  float dot_message_v_dir = 0.0;
-  float det_message_v_dir = 0.0;
   float angle_message_v_dir = 0.0;
   // relative speed between agents
   float relative_speed = 0.0;
@@ -123,6 +148,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float n_left_conc_multi[N_SPECIES] = {};  
   float n_front_conc_multi[N_SPECIES] = {};  
   float n_back_conc_multi[N_SPECIES] = {};  
+  
+  const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   
 
   //printf("Interaction agent %d [%d %d %d]\n", id, agent_grid_i, agent_grid_j, agent_grid_k);
@@ -200,36 +227,44 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 				if (message_grid_k > agent_grid_k) 
 					n_up_conc_multi[i] = message_conc_multi[i];
 			}
-        }		
-        
-        message_vx = message.getVariable<float>("vx");
-        message_vy = message.getVariable<float>("vy");
-        message_vz = message.getVariable<float>("vz");
+		}		
+		
+		message_vx = message.getVariable<float>("vx");
+		message_vy = message.getVariable<float>("vy");
+		message_vz = message.getVariable<float>("vz");
+		message_k_elast = message.getVariable<float>("k_elast");
+		message_orx = message.getVariable<float>("orx");
+		message_ory = message.getVariable<float>("ory");
+		message_orz = message.getVariable<float>("orz");
+		
+		// angles between agent orientation and the direction joining agents.
+		angle_agent_ori_dir = getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_x,dir_y,dir_z);
+        angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
+		cos_ori_agent = fabsf(cosf(angle_agent_ori_dir));
+		cos_ori_message = fabsf(cosf(angle_message_ori_dir));
+		
+		if (cos_ori_agent < EPSILON){
+			cos_ori_agent = EPSILON;
+		}
+		if (cos_ori_message < EPSILON){
+			cos_ori_message = EPSILON;
+		}
+		
+		if (id == 9) {
+            printf("id1: %d id2: %d cos ori [agent: %g - message: %g] positions [%g %g %g]-[%g %g %g] \n", id, message_id, cos_ori_agent,cos_ori_message,agent_x,agent_y,agent_z,message_x,message_y,message_z);            
+        }
+		cos_ori_agent = 1.0;
+		cos_ori_message = 1.0;
+		
+		k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
 
         cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
         cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
         cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
-
-        dot_agent_v_dir = agent_vx * dir_x + agent_vy * dir_y + agent_vz * dir_z;
-        vec3CrossProd(cross_agent_vx_dir, cross_agent_vy_dir, cross_agent_vz_dir, agent_vx, agent_vy, agent_vz, dir_x, dir_y, dir_z);
-        det_agent_v_dir = vec3Length(cross_agent_vx_dir, cross_agent_vy_dir, cross_agent_vz_dir);
-        if (fabsf(dot_agent_v_dir) > EPSILON) {
-            angle_agent_v_dir = atan2f(det_agent_v_dir, dot_agent_v_dir);
-        }
-        else {
-            angle_agent_v_dir = 0.0;
-        }
-
-        dot_message_v_dir = message_vx * dir_x + message_vy * dir_y + message_vz * dir_z;
-        vec3CrossProd(cross_message_vx_dir, cross_message_vy_dir, cross_message_vz_dir, message_vx, message_vy, message_vz, dir_x, dir_y, dir_z);
-        det_message_v_dir = vec3Length(cross_message_vx_dir, cross_message_vy_dir, cross_message_vz_dir);
-        angle_message_v_dir = atan2f(det_message_v_dir, dot_message_v_dir);
-        if (fabsf(dot_message_v_dir) > EPSILON) {
-            angle_message_v_dir = atan2f(det_message_v_dir, dot_message_v_dir);
-        }
-        else {
-            angle_message_v_dir = 0.0;
-        }
+		
+		// angles between agent & message velocity vector and the direction joining them		
+		angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
+		angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
 
         // relative speed <0 means particles are getting closer
         relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
@@ -262,7 +297,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   //printf("Array3D for agent %d read %d messages! grid [%d %d %d], pos (%2.6f , %2.6f, %2.6f) \n", id, ct, agent_grid_i, agent_grid_j, agent_grid_k, agent_x, agent_y, agent_z);
 
   //Apply diffusion equation
-  const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
+  
   float R = 0.0; // reactive term. Unused for now
   float dx = ((n_left_dist > 0.0) & (n_right_dist > 0.0)) ? (n_left_dist + n_right_dist) / 2.0 : fmaxf(n_left_dist,n_right_dist);
   float dy = ((n_front_dist > 0.0) & (n_back_dist > 0.0)) ? (n_front_dist + n_back_dist) / 2.0 : fmaxf(n_front_dist,n_back_dist);
@@ -287,7 +322,48 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	}	
   }
   
+  // Re-orientation of fibers towards the direction of the resultant force
+  // inc_dir = ECM_ORIENTATION_RATE * DELTA_TIME * cross(agent_ori,cross(force_dir,agent_ori))
   
+  float force_magnitude = vec3Length(agent_fx,agent_fy,agent_fz);
+  
+  if (force_magnitude > 0){
+	  const float ECM_ORIENTATION_RATE = FLAMEGPU->environment.getProperty<float>("ECM_ORIENTATION_RATE");
+	  float inc_dir_x = 0.0;
+	  float inc_dir_y = 0.0;
+	  float inc_dir_z = 0.0;
+	  float dir_fx = agent_fx / force_magnitude;
+	  float dir_fy = agent_fy / force_magnitude;
+	  float dir_fz = agent_fz / force_magnitude;
+	  float cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx,dir_fy,dir_fz));
+	  if (cos_force_ori < 0.0){ // invert direction to find the closest angle between force and orientation directions
+		  dir_fx = -1 * dir_fx;
+		  dir_fy = -1 * dir_fy;
+		  dir_fz = -1 * dir_fz;
+	  }
+	  float tmpx = 0.0;
+	  float tmpy = 0.0;
+	  float tmpz = 0.0;
+	  
+	  if (id == 9) {
+		printf("ORI ANTES id1: %d  ori  [%g %g %g] \n", id, agent_orx,agent_ory,agent_orz); 
+		printf("inc_dir ANTES id1: %d  inc_dir  [%g %g %g] \n", id, inc_dir_x,inc_dir_y,inc_dir_z); 
+		printf("dir_f ANTES id1: %d  dirf  [%g %g %g] \n", id, dir_fx,dir_fy,dir_fz); 		
+	  }
+	  
+	  vec3CrossProd(tmpx, tmpy, tmpz, dir_fx, dir_fy, dir_fz, agent_orx, agent_ory, agent_orz);
+	  vec3CrossProd(inc_dir_x, inc_dir_y, inc_dir_z, agent_orx, agent_ory, agent_orz, tmpx, tmpy, tmpz); 
+	  
+	  agent_orx += inc_dir_x * ECM_ORIENTATION_RATE * DELTA_TIME;
+	  agent_ory += inc_dir_y * ECM_ORIENTATION_RATE * DELTA_TIME;
+	  agent_orz += inc_dir_z * ECM_ORIENTATION_RATE * DELTA_TIME;
+  }
+  
+  
+    
+  FLAMEGPU->setVariable<float>("orx", agent_orx);
+  FLAMEGPU->setVariable<float>("ory", agent_ory);
+  FLAMEGPU->setVariable<float>("orz", agent_orz);
   FLAMEGPU->setVariable<float>("fx", agent_fx);
   FLAMEGPU->setVariable<float>("fy", agent_fy);
   FLAMEGPU->setVariable<float>("fz", agent_fz);

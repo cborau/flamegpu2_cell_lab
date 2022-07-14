@@ -74,7 +74,7 @@ EPSILON = 0.0000000001;
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 10;
+N = 3;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
@@ -85,9 +85,10 @@ STEPS = 100;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 1.0;       #[N/units/kg]
-ECM_D_DUMPING = 1.0;     #[N*s/units/kg]
-ECM_MASS = 1.0;          #[dimensionless to make K and D mass dependent]
+ECM_K_ELAST = 2.0;          #[N/units/kg]
+ECM_D_DUMPING = 1.0;        #[N*s/units/kg]
+ECM_MASS = 1.0;             #[dimensionless to make K and D mass dependent]
+ECM_ORIENTATION_RATE = 0.1; #[1/seconds]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.02, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
@@ -101,8 +102,6 @@ BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIF
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
 ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
-#ECM_ECM_INTERACTION_RADIUS = 100;
-#ECM_ECM_EQUILIBRIUM_DISTANCE = 0.45;
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1])  / (N - 1);
 print("ECM_ECM_EQUILIBRIUM_DISTANCE: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
@@ -134,8 +133,8 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
-INCLUDE_VASCULARIZATION = True;                                   # if True, vascularization is taken into account     
-INIT_VASCULARIZATION_CONCENTRATION_VALS = [1.0, -1.0]              # initial concentration of each species on the VASCULARIZATION agents
+INCLUDE_VASCULARIZATION = False;                                   # if True, vascularization is taken into account     
+INIT_VASCULARIZATION_CONCENTRATION_VALS = [-1.0, -1.0]              # initial concentration of each species on the VASCULARIZATION agents
 N_VASCULARIZATION_POINTS = 0;                                     # declared here. Points are loaded from file
 VASCULARIZATION_POINTS_COORDS = None;                             # declared here. Coords loaded from file
 
@@ -249,15 +248,15 @@ env.newPropertyUInt("N_VASCULARIZATION_POINTS", N_VASCULARIZATION_POINTS);
 # ------------------------------------------------------
 # ECM BEHAVIOUR 
 # ------------------------------------------------------
-#env.newPropertyFloat("ECM_ECM_INTERACTION_RADIUS", ECM_ECM_INTERACTION_RADIUS);
 # Equilibrium radius at which elastic force is 0. 
 # If ECM_ECM_INTERACTION_RADIUS > ECM_ECM_EQUILIBRIUM_DISTANCE: both repulsion/atraction can occur
 # If ECM_ECM_INTERACTION_RADIUS <= ECM_ECM_EQUILIBRIUM_DISTANCE: only repulsion can occur
 env.newPropertyFloat("ECM_ECM_EQUILIBRIUM_DISTANCE", ECM_ECM_EQUILIBRIUM_DISTANCE);
 # Mechanical parameters
-env.newPropertyFloat("ECM_K_ELAST", ECM_K_ELAST);
+env.newPropertyFloat("ECM_K_ELAST", ECM_K_ELAST); # initial K_ELAST for agents
 env.newPropertyFloat("ECM_D_DUMPING", ECM_D_DUMPING);
 env.newPropertyFloat("ECM_MASS", ECM_MASS);
+env.newPropertyFloat("ECM_ORIENTATION_RATE",ECM_ORIENTATION_RATE);
 
 # ------------------------------------------------------
 # BOUNDARY BEHAVIOUR 
@@ -321,6 +320,10 @@ ecm_grid_location_message.newVariableFloat("z");
 ecm_grid_location_message.newVariableFloat("vx");
 ecm_grid_location_message.newVariableFloat("vy");
 ecm_grid_location_message.newVariableFloat("vz");
+ecm_grid_location_message.newVariableFloat("orx");
+ecm_grid_location_message.newVariableFloat("ory");
+ecm_grid_location_message.newVariableFloat("orz");
+ecm_grid_location_message.newVariableFloat("k_elast");
 ecm_grid_location_message.newVariableUInt8("grid_i");
 ecm_grid_location_message.newVariableUInt8("grid_j");
 ecm_grid_location_message.newVariableUInt8("grid_k");
@@ -373,19 +376,22 @@ ecm_agent.newVariableFloat("vz");
 ecm_agent.newVariableFloat("fx");
 ecm_agent.newVariableFloat("fy");
 ecm_agent.newVariableFloat("fz");
+ecm_agent.newVariableFloat("orx");          # orientation of the fibers represented by the agent
+ecm_agent.newVariableFloat("ory");          
+ecm_agent.newVariableFloat("orz");          
 ecm_agent.newVariableFloat("k_elast");
 ecm_agent.newVariableFloat("d_dumping");
 ecm_agent.newVariableFloat("mass");
-ecm_agent.newVariableFloat("boundary_fx"); #boundary_f[A]: normal force coming from boundary [A] when elastic boundaries option is selected.
+ecm_agent.newVariableFloat("boundary_fx");  #boundary_f[A]: normal force coming from boundary [A] when elastic boundaries option is selected.
 ecm_agent.newVariableFloat("boundary_fy");
 ecm_agent.newVariableFloat("boundary_fz");
-ecm_agent.newVariableFloat("f_bx_pos"); #f_b[A]_[B]: normal force transmitted to the boundary [A]_[B] when agent is clamped
+ecm_agent.newVariableFloat("f_bx_pos");     #f_b[A]_[B]: normal force transmitted to the boundary [A]_[B] when agent is clamped
 ecm_agent.newVariableFloat("f_bx_neg");
 ecm_agent.newVariableFloat("f_by_pos");
 ecm_agent.newVariableFloat("f_by_neg");
 ecm_agent.newVariableFloat("f_bz_pos");
 ecm_agent.newVariableFloat("f_bz_neg");
-ecm_agent.newVariableFloat("f_bx_pos_y"); #f_b[A]_[B]_[C]: shear force transmitted to the boundary [A]_[B] in the direction [C] when agent is clamped
+ecm_agent.newVariableFloat("f_bx_pos_y");   #f_b[A]_[B]_[C]: shear force transmitted to the boundary [A]_[B] in the direction [C] when agent is clamped
 ecm_agent.newVariableFloat("f_bx_pos_z");
 ecm_agent.newVariableFloat("f_bx_neg_y");
 ecm_agent.newVariableFloat("f_bx_neg_z");
@@ -531,6 +537,9 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("fx", 0.0);
                 instance.setVariableFloat("fy", 0.0);
                 instance.setVariableFloat("fz", 0.0);
+                instance.setVariableFloat("orx", 0.0);
+                instance.setVariableFloat("ory", math.sqrt(2.0)/2.0);
+                instance.setVariableFloat("orz", math.sqrt(2.0)/2.0);
                 instance.setVariableFloat("k_elast", k_elast);
                 instance.setVariableFloat("d_dumping", d_dumping);
                 instance.setVariableFloat("mass", mass);
@@ -845,6 +854,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
 
                 coords = list()                
                 velocity = list()
+                orientation = list()
                 force = list()
                 elastic_energy = list()
                 concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
@@ -853,9 +863,11 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
                    velocity_ai = (ai.getVariableFloat("vx"),ai.getVariableFloat("vy"),ai.getVariableFloat("vz"))
                    force_ai = (ai.getVariableFloat("fx"),ai.getVariableFloat("fy"),ai.getVariableFloat("fz"))
+                   orientation_ai = (ai.getVariableFloat("orx"),ai.getVariableFloat("ory"),ai.getVariableFloat("orz"))
                    coords.append(coords_ai)
                    velocity.append(velocity_ai)
                    force.append(force_ai)
+                   orientation.append(orientation_ai)
                    elastic_energy.append(ai.getVariableFloat("elastic_energy"))
                    concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
                 print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
@@ -973,18 +985,24 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                         for i in range(8):
                             file.write("0.0 \n") # boundary corners
                         
-                    file.write("VECTORS velocity float" + '\n')  
-                    
+                    file.write("VECTORS velocity float" + '\n')                    
                     for v_ai in velocity:
                         file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0],v_ai[1],v_ai[2]))
                     for i in range(8):
                         file.write("0.0 0.0 0.0 \n") # boundary corners
-                    file.write("VECTORS force float" + '\n')  
-                    
+                        
+                    file.write("VECTORS force float" + '\n')                    
                     for f_ai in force:
                         file.write("{:.4f} {:.4f} {:.4f} \n".format(f_ai[0],f_ai[1],f_ai[2]))
                     for i in range(8):
                         file.write("0.0 0.0 0.0 \n") # boundary corners
+                    
+                    file.write("VECTORS orientation float" + '\n')                    
+                    for o_ai in orientation:
+                        file.write("{:.4f} {:.4f} {:.4f} \n".format(o_ai[0],o_ai[1],o_ai[2]))
+                    for i in range(8):
+                        file.write("0.0 0.0 0.0 \n") # boundary corners
+                      
 
                 print ("... succesful save ")
                 print ("=================================")
