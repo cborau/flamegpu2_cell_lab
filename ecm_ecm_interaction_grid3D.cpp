@@ -345,7 +345,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	  float tmpy = 0.0;
 	  float tmpz = 0.0;
 	  
-	  if (id == 9) {
+	  if (id == 9 && (DEBUG_PRINTING == 1)) {
 		printf("ORI ANTES id1: %d  ori  [%g %g %g] \n", id, agent_orx,agent_ory,agent_orz); 
 		printf("inc_dir ANTES id1: %d  inc_dir  [%g %g %g] \n", id, inc_dir_x,inc_dir_y,inc_dir_z); 
 		printf("dir_f ANTES id1: %d  dirf  [%g %g %g] \n", id, dir_fx,dir_fy,dir_fz); 		
@@ -357,6 +357,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	  agent_orx += inc_dir_x * ECM_ORIENTATION_RATE * DELTA_TIME;
 	  agent_ory += inc_dir_y * ECM_ORIENTATION_RATE * DELTA_TIME;
 	  agent_orz += inc_dir_z * ECM_ORIENTATION_RATE * DELTA_TIME;
+	  
+	  FLAMEGPU->setVariable<float>("alignment", fabsf(cos_force_ori));
   }
   
   

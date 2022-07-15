@@ -23,22 +23,35 @@
 #|    ----------------------------------------------------------------|
 #|    | Agents                                                        |
 #|    ----------------------------------------------------------------|
-#|        - corner agents: visual purpose to show the domain limits   |
+#|        - Corner agents: visual purpose (they show domain limits)   |
 #|                                                                    |
 #|        - ECM agents: agents representing the extracelluar matrix   |
 #|                                                                    |
 #|              . mechanical relationship: dumped system              |
 #|                                                                    |
-#|                       +---|D|---+                                  |
-#|                 a1 ---|         |--- a2                            |
-#|                       +-/\/K\/\-+                                  |
+#|                       +---------|D|--------+                       |
+#|                 a1 ---|                    |--- a2                 |
+#|                       +-/\/K1\/\--/\/K2\/\-+                       |
 #|                                                                    |
 #|              . interchange of substances:                          |
 #|                                                                    |
 #|                 a1 <--|diffusion|--> a2                            |
 #|                                                                    |
+#|              . orientation of fibers that:                         |
+#|                                                                    |
+#|                 affects the elastic constant (K)                   |
+#|                 re-aligns over time towards force direction        |
+#|                                                                    |
+#|        - Vascularization agents: agents representing the vessels   |
+#|                                                                    |
+#|              . transport of substances:                            |
+#|                                                                    |
+#|                 v1 ---|diffusion|--> a1                            |
+#|                                                                    |
 #+--------------------------------------------------------------------+
 #+====================================================================+
+
+# TODO: stablish a force threshold for realigment higher than 0. 
 
 from pyflamegpu import *
 import sys, random, math
@@ -63,7 +76,7 @@ ENSEMBLE_RUNS = 0;
 VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;
-SHOW_PLOTS = False;           # Show plots at the end of the simulation
+SHOW_PLOTS = True;           # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = True;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
 SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
 CURR_PATH = pathlib.Path().absolute();
@@ -74,24 +87,24 @@ EPSILON = 0.0000000001;
 print("Executing in ", CURR_PATH);
 # Number of agents per direction (x,y,z)
 #+--------------------------------------------------------------------+
-N = 3;
+N = 10;
 ECM_AGENTS_PER_DIR = [N , N, N];
 ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS_PER_DIR[2]; 
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.1; # seconds
-STEPS = 100;
+STEPS = 200;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
 ECM_K_ELAST = 2.0;          #[N/units/kg]
 ECM_D_DUMPING = 1.0;        #[N*s/units/kg]
 ECM_MASS = 1.0;             #[dimensionless to make K and D mass dependent]
-ECM_ORIENTATION_RATE = 0.1; #[1/seconds]
+ECM_ORIENTATION_RATE = 0.5; #[1/seconds]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.02, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -323,6 +336,7 @@ ecm_grid_location_message.newVariableFloat("vz");
 ecm_grid_location_message.newVariableFloat("orx");
 ecm_grid_location_message.newVariableFloat("ory");
 ecm_grid_location_message.newVariableFloat("orz");
+ecm_grid_location_message.newVariableFloat("alignment");
 ecm_grid_location_message.newVariableFloat("k_elast");
 ecm_grid_location_message.newVariableUInt8("grid_i");
 ecm_grid_location_message.newVariableUInt8("grid_j");
@@ -378,7 +392,8 @@ ecm_agent.newVariableFloat("fy");
 ecm_agent.newVariableFloat("fz");
 ecm_agent.newVariableFloat("orx");          # orientation of the fibers represented by the agent
 ecm_agent.newVariableFloat("ory");          
-ecm_agent.newVariableFloat("orz");          
+ecm_agent.newVariableFloat("orz");
+ecm_agent.newVariableFloat("alignment");           
 ecm_agent.newVariableFloat("k_elast");
 ecm_agent.newVariableFloat("d_dumping");
 ecm_agent.newVariableFloat("mass");
@@ -424,6 +439,46 @@ if INCLUDE_VASCULARIZATION:
     ecm_agent.newRTCFunctionFile("ecm_vascularization_interaction", ecm_vascularization_interaction_file).setMessageInput("vascularization_location_message");
 ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
 ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
+
+""" 
+  Helper functions 
+"""
+def randomVector3D():
+    """
+    Generates a random 3D unit vector (direction) with a uniform spherical distribution
+
+    Returns
+    -------
+    (x,y,z) : tuple
+        Coordinates of the vector.
+    """
+    phi = np.random.uniform(0, np.pi * 2)
+    costheta = np.random.uniform(-1, 1)
+    theta = np.arccos(costheta)
+    x = np.sin(theta) * np.cos(phi)
+    y = np.sin(theta) * np.sin(phi)
+    z = np.cos(theta)
+    return (x, y, z)
+    
+def getRandomVectors3D(n_vectors: int):
+    """
+    Generates an array of random 3D unit vectors (directions) with a uniform spherical distribution
+
+    Parameters
+    ----------
+    n_vectors : int
+        Number of vectors to be generated
+    Returns
+    -------
+    v_array : Numpy array
+        Coordinates of the vectors. Shape: [n_vectors, 3].
+    """
+    v_array = np.zeros((n_vectors, 3))
+    for i in range(n_vectors):
+        vi = randomVector3D()
+        v_array[i, :] = np.array(vi, dtype='float')
+
+    return v_array
 
 
 """
@@ -512,6 +567,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     coords_x = np.linspace(BOUNDARY_COORDS[1] + offset[1], BOUNDARY_COORDS[0] - offset[0], agents_per_dir[0]);
     coords_y = np.linspace(BOUNDARY_COORDS[3] + offset[3], BOUNDARY_COORDS[2] - offset[2], agents_per_dir[1]);
     coords_z = np.linspace(BOUNDARY_COORDS[5] + offset[5], BOUNDARY_COORDS[4] - offset[4], agents_per_dir[2]);
+    orientations = getRandomVectors3D(populationSize)
     count = -1;
     i = -1;
     j = -1;
@@ -537,9 +593,10 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("fx", 0.0);
                 instance.setVariableFloat("fy", 0.0);
                 instance.setVariableFloat("fz", 0.0);
-                instance.setVariableFloat("orx", 0.0);
-                instance.setVariableFloat("ory", math.sqrt(2.0)/2.0);
-                instance.setVariableFloat("orz", math.sqrt(2.0)/2.0);
+                instance.setVariableFloat("orx", orientations[count, 0]);
+                instance.setVariableFloat("ory", orientations[count, 1]);
+                instance.setVariableFloat("orz", orientations[count, 2]);
+                instance.setVariableFloat("alignment", 0.0);
                 instance.setVariableFloat("k_elast", k_elast);
                 instance.setVariableFloat("d_dumping", d_dumping);
                 instance.setVariableFloat("mass", mass);
@@ -855,6 +912,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 coords = list()                
                 velocity = list()
                 orientation = list()
+                alignment = list()
                 force = list()
                 elastic_energy = list()
                 concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
@@ -864,6 +922,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    velocity_ai = (ai.getVariableFloat("vx"),ai.getVariableFloat("vy"),ai.getVariableFloat("vz"))
                    force_ai = (ai.getVariableFloat("fx"),ai.getVariableFloat("fy"),ai.getVariableFloat("fz"))
                    orientation_ai = (ai.getVariableFloat("orx"),ai.getVariableFloat("ory"),ai.getVariableFloat("orz"))
+                   alignment.append(ai.getVariableFloat("alignment"))
                    coords.append(coords_ai)
                    velocity.append(velocity_ai)
                    force.append(force_ai)
@@ -973,6 +1032,13 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                     file.write("LOOKUP_TABLE default" + '\n')                    
                     for ee_ai in elastic_energy:
                         file.write("{:.4f} \n".format(ee_ai))
+                    for i in range(8):
+                        file.write("0.0 \n") # boundary corners
+                        
+                    file.write("SCALARS alignment float 1" + '\n')
+                    file.write("LOOKUP_TABLE default" + '\n')                    
+                    for a_ai in alignment:
+                        file.write("{:.4f} \n".format(a_ai))
                     for i in range(8):
                         file.write("0.0 \n") # boundary corners
                                             
