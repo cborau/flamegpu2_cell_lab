@@ -93,18 +93,18 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.1; # seconds
+TIME_STEP = 0.075; # seconds
 STEPS = 200;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 2.0;          #[N/units/kg]
-ECM_D_DUMPING = 1.0;        #[N*s/units/kg]
-ECM_MASS = 1.0;             #[dimensionless to make K and D mass dependent]
-ECM_ORIENTATION_RATE = 0.5; #[1/seconds]
+ECM_K_ELAST = 2.0;            #[N/units/kg]
+ECM_D_DUMPING = 1.0;          #[N*s/units/kg]
+ECM_MASS = 1.0;               #[dimensionless to make K and D mass dependent]
+ECM_GEL_CONCENTRATION = 1.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.025, -0.025, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -114,14 +114,16 @@ BOUNDARY_DUMPING_VALUE = 0.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
-ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
+ALLOW_AGENT_SLIDING = [0, 0, 1, 1, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1])  / (N - 1);
-print("ECM_ECM_EQUILIBRIUM_DISTANCE: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
+print("ECM_ECM_EQUILIBRIUM_DISTANCE [units]: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
+ECM_ORIENTATION_RATE = 0.1 / (ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);   #[1/seconds]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces 
+print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-print("Message rad: ", MAX_SEARCH_RADIUS)
+print("MAX_SEARCH_RADIUS [units]: ", MAX_SEARCH_RADIUS)
 OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
 OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
@@ -270,6 +272,8 @@ env.newPropertyFloat("ECM_K_ELAST", ECM_K_ELAST); # initial K_ELAST for agents
 env.newPropertyFloat("ECM_D_DUMPING", ECM_D_DUMPING);
 env.newPropertyFloat("ECM_MASS", ECM_MASS);
 env.newPropertyFloat("ECM_ORIENTATION_RATE",ECM_ORIENTATION_RATE);
+env.newPropertyFloat("ECM_GEL_CONCENTRATION",ECM_GEL_CONCENTRATION);
+
 
 # ------------------------------------------------------
 # BOUNDARY BEHAVIOUR 
@@ -337,6 +341,7 @@ ecm_grid_location_message.newVariableFloat("orx");
 ecm_grid_location_message.newVariableFloat("ory");
 ecm_grid_location_message.newVariableFloat("orz");
 ecm_grid_location_message.newVariableFloat("alignment");
+ecm_grid_location_message.newVariableFloat("gel_conc");
 ecm_grid_location_message.newVariableFloat("k_elast");
 ecm_grid_location_message.newVariableUInt8("grid_i");
 ecm_grid_location_message.newVariableUInt8("grid_j");
@@ -393,7 +398,8 @@ ecm_agent.newVariableFloat("fz");
 ecm_agent.newVariableFloat("orx");          # orientation of the fibers represented by the agent
 ecm_agent.newVariableFloat("ory");          
 ecm_agent.newVariableFloat("orz");
-ecm_agent.newVariableFloat("alignment");           
+ecm_agent.newVariableFloat("alignment");  
+ecm_agent.newVariableFloat("gel_conc");         
 ecm_agent.newVariableFloat("k_elast");
 ecm_agent.newVariableFloat("d_dumping");
 ecm_agent.newVariableFloat("mass");
@@ -479,6 +485,25 @@ def getRandomVectors3D(n_vectors: int):
         v_array[i, :] = np.array(vi, dtype='float')
 
     return v_array
+    
+def getFixedVectors3D(n_vectors: int, v_dir: np.array):
+    """
+    Generates an array of 3D unit vectors (directions) in the specified direction
+
+    Parameters
+    ----------
+    n_vectors : int
+        Number of vectors to be generated
+    v_dir : Numpy array
+        Direction of the vectors
+    Returns
+    -------
+    v_array : Numpy array
+        Coordinates of the vectors. Shape: [n_vectors, 3].
+    """
+    v_array = np.tile(v_dir,(n_vectors,1))
+
+    return v_array
 
 
 """
@@ -558,6 +583,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     d_dumping = FLAMEGPU.environment.getPropertyFloat("ECM_D_DUMPING");
     mass = FLAMEGPU.environment.getPropertyFloat("ECM_MASS");
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
+    gel_conc = FLAMEGPU.environment.getPropertyFloat("ECM_GEL_CONCENTRATION");
     current_id += 1;
     print("ECM:");
     print("current_id:", current_id);
@@ -568,6 +594,9 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     coords_y = np.linspace(BOUNDARY_COORDS[3] + offset[3], BOUNDARY_COORDS[2] - offset[2], agents_per_dir[1]);
     coords_z = np.linspace(BOUNDARY_COORDS[5] + offset[5], BOUNDARY_COORDS[4] - offset[4], agents_per_dir[2]);
     orientations = getRandomVectors3D(populationSize)
+    # fixed_dir = np.zeros((1,3));
+    # fixed_dir[0,1] = 1.0;
+    # orientations = getFixedVectors3D(populationSize,fixed_dir);
     count = -1;
     i = -1;
     j = -1;
@@ -597,6 +626,7 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
                 instance.setVariableFloat("ory", orientations[count, 1]);
                 instance.setVariableFloat("orz", orientations[count, 2]);
                 instance.setVariableFloat("alignment", 0.0);
+                instance.setVariableFloat("gel_conc", gel_conc);
                 instance.setVariableFloat("k_elast", k_elast);
                 instance.setVariableFloat("d_dumping", d_dumping);
                 instance.setVariableFloat("mass", mass);
@@ -913,6 +943,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 velocity = list()
                 orientation = list()
                 alignment = list()
+                gel_conc = list()
                 force = list()
                 elastic_energy = list()
                 concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
@@ -923,6 +954,7 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                    force_ai = (ai.getVariableFloat("fx"),ai.getVariableFloat("fy"),ai.getVariableFloat("fz"))
                    orientation_ai = (ai.getVariableFloat("orx"),ai.getVariableFloat("ory"),ai.getVariableFloat("orz"))
                    alignment.append(ai.getVariableFloat("alignment"))
+                   gel_conc.append(ai.getVariableFloat("gel_conc"))
                    coords.append(coords_ai)
                    velocity.append(velocity_ai)
                    force.append(force_ai)
@@ -1039,6 +1071,13 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                     file.write("LOOKUP_TABLE default" + '\n')                    
                     for a_ai in alignment:
                         file.write("{:.4f} \n".format(a_ai))
+                    for i in range(8):
+                        file.write("0.0 \n") # boundary corners
+                        
+                    file.write("SCALARS gel_conc float 1" + '\n')
+                    file.write("LOOKUP_TABLE default" + '\n')                    
+                    for gc_ai in gel_conc:
+                        file.write("{:.4f} \n".format(gc_ai))
                     for i in range(8):
                         file.write("0.0 \n") # boundary corners
                                             
