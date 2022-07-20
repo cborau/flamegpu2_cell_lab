@@ -197,6 +197,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   float agent_vz = FLAMEGPU->getVariable<float>("vz");
   
   // Agent concentration
+  int INCLUDE_DIFFUSION = FLAMEGPU->environment.getProperty<int>("INCLUDE_DIFFUSION");
   const uint8_t N_SPECIES = 2; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function. TODO: declare it somehow at compile time
   float agent_conc_multi[N_SPECIES] = {}; 
   for (int i = 0; i < N_SPECIES; i++) {
@@ -454,31 +455,33 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   //printf("Array3D for agent %d read %d messages! grid [%d %d %d], pos (%2.6f , %2.6f, %2.6f) \n", id, ct, agent_grid_i, agent_grid_j, agent_grid_k, agent_x, agent_y, agent_z);
 
   //Apply diffusion equation
-  
-  float R = 0.0; // reactive term. Unused for now
-  float dx = ((n_left_dist > 0.0) & (n_right_dist > 0.0)) ? (n_left_dist + n_right_dist) / 2.0 : fmaxf(n_left_dist,n_right_dist);
-  float dy = ((n_front_dist > 0.0) & (n_back_dist > 0.0)) ? (n_front_dist + n_back_dist) / 2.0 : fmaxf(n_front_dist,n_back_dist);
-  float dz = ((n_up_dist > 0.0) & (n_down_dist > 0.0)) ? (n_up_dist + n_down_dist) / 2.0 : fmaxf(n_up_dist,n_down_dist);
-  
-  //Apply diffusion equation for multiple species
-  float agent_conc_prev_multi[N_SPECIES] = {}; 
-  for (int i = 0; i < N_SPECIES; i++) {
-	float DIFFUSION_COEFF = FLAMEGPU->environment.getProperty<float>("DIFFUSION_COEFF_MULTI",i);
-	float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);
-    float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
-    float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
-	agent_conc_prev_multi[i] = agent_conc_multi[i];
-    agent_conc_multi[i] = agent_conc_prev_multi[i] + Fx * (n_left_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_right_conc_multi[i]) + Fy * (n_front_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_back_conc_multi[i]) + Fz * (n_up_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_down_conc_multi[i]) + R * DELTA_TIME;
-    FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
-	if ((id > 8) && (DEBUG_PRINTING == 1)){  
-		printf("DIFFUSION for agent %d, species %d, [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, i+1, dx, dy, dz, Fx, Fy, Fz);
-		printf("agent %d: MULTI left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc_multi[i], n_right_conc_multi[i]);
-		printf("agent %d: MULTI front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc_multi[i], n_back_conc_multi[i]);
-		printf("agent %d: MULTI up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc_multi[i], n_down_conc_multi[i]);
-		printf("agent %d: MULTI conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev_multi[i], agent_conc_multi[i]); 
-	}	
+  if (INCLUDE_DIFFUSION == 1){
+	  float R = 0.0; // reactive term. Unused for now
+	  float dx = ((n_left_dist > 0.0) & (n_right_dist > 0.0)) ? (n_left_dist + n_right_dist) / 2.0 : fmaxf(n_left_dist,n_right_dist);
+	  float dy = ((n_front_dist > 0.0) & (n_back_dist > 0.0)) ? (n_front_dist + n_back_dist) / 2.0 : fmaxf(n_front_dist,n_back_dist);
+	  float dz = ((n_up_dist > 0.0) & (n_down_dist > 0.0)) ? (n_up_dist + n_down_dist) / 2.0 : fmaxf(n_up_dist,n_down_dist);
+	  
+	  //Apply diffusion equation for multiple species
+	  float agent_conc_prev_multi[N_SPECIES] = {}; 
+	  for (int i = 0; i < N_SPECIES; i++) {
+		float DIFFUSION_COEFF = FLAMEGPU->environment.getProperty<float>("DIFFUSION_COEFF_MULTI",i);
+		float Fx = DIFFUSION_COEFF * DELTA_TIME / powf(dx, 2.0);
+		float Fy = DIFFUSION_COEFF * DELTA_TIME / powf(dy, 2.0);
+		float Fz = DIFFUSION_COEFF * DELTA_TIME / powf(dz, 2.0);
+		agent_conc_prev_multi[i] = agent_conc_multi[i];
+		agent_conc_multi[i] = agent_conc_prev_multi[i] + Fx * (n_left_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_right_conc_multi[i]) + Fy * (n_front_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_back_conc_multi[i]) + Fz * (n_up_conc_multi[i] - (2 * agent_conc_prev_multi[i]) + n_down_conc_multi[i]) + R * DELTA_TIME;
+		FLAMEGPU->setVariable<float, N_SPECIES>("concentration_multi", i, agent_conc_multi[i]);
+		if ((id > 8) && (DEBUG_PRINTING == 1)){  
+			printf("DIFFUSION for agent %d, species %d, [dx,dy,dz] = [%2.6f , %2.6f, %2.6f], [Fx,Fy,Fz] = [%2.6f , %2.6f, %2.6f] \n", id, i+1, dx, dy, dz, Fx, Fy, Fz);
+			printf("agent %d: MULTI left conc = %2.6f, right conc = %2.6f \n", id, n_left_conc_multi[i], n_right_conc_multi[i]);
+			printf("agent %d: MULTI front conc = %2.6f, back conc = %2.6f \n", id, n_front_conc_multi[i], n_back_conc_multi[i]);
+			printf("agent %d: MULTI up conc = %2.6f, down conc = %2.6f \n", id, n_up_conc_multi[i], n_down_conc_multi[i]);
+			printf("agent %d: MULTI conc prev = %2.6f, current conc = %2.6f \n", id, agent_conc_prev_multi[i], agent_conc_multi[i]); 
+		}	
+	  }	  
   }
   
+
   // Re-orientation of fibers towards the direction of the maximum absolute force
   // inc_dir = ECM_ORIENTATION_RATE * DELTA_TIME * cross(agent_ori,cross(force_dir,agent_ori))
   

@@ -40,7 +40,11 @@
 #|              . orientation of fibers that:                         |
 #|                                                                    |
 #|                 affects the elastic constant (K)                   |
-#|                 re-aligns over time towards force direction        |
+#|                 re-aligns over time towards higher traction dir    |
+#|                                                                    |
+#|                        /   ↑                               |       |
+#|                 a1 ---/--- | traction  --> time -->  a1 ---|---    |
+#|                      /     ↓                               |       |
 #|                                                                    |
 #|        - Vascularization agents: agents representing the vessels   |
 #|                                                                    |
@@ -75,10 +79,12 @@ ENSEMBLE = False;
 ENSEMBLE_RUNS = 0;
 VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
-PAUSE_EVERY_STEP = False;
-SHOW_PLOTS = True;           # Show plots at the end of the simulation
-SAVE_DATA_TO_FILE = True;    # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 2;       # Affects both the .vtk files and the Dataframes storing boundary data
+PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
+SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
+SHOW_PLOTS = True;            # Show plots at the end of the simulation
+SAVE_DATA_TO_FILE = True;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_EVERY_N_STEPS = 4;       # Affects both the .vtk files and the Dataframes storing boundary data
+
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
 RES_PATH.mkdir(parents=True, exist_ok=True);
@@ -93,18 +99,18 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.075; # seconds
-STEPS = 200;
+TIME_STEP = 0.05; # seconds
+STEPS = 400;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 2.0;            #[N/units/kg]
+ECM_K_ELAST = 4.0;            #[N/units/kg]
 ECM_D_DUMPING = 1.0;          #[N*s/units/kg]
 ECM_MASS = 1.0;               #[dimensionless to make K and D mass dependent]
 ECM_GEL_CONCENTRATION = 1.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
-BOUNDARY_DISP_RATES = [0.0, 0.0, 0.025, -0.025, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -114,7 +120,7 @@ BOUNDARY_DUMPING_VALUE = 0.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
-ALLOW_AGENT_SLIDING = [0, 0, 1, 1, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
+ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1])  / (N - 1);
 print("ECM_ECM_EQUILIBRIUM_DISTANCE [units]: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
@@ -139,6 +145,7 @@ if OSCILLATORY_SHEAR_ASSAY:
 
 # Diffusion related paramenters
 #+--------------------------------------------------------------------+
+INCLUDE_DIFFUSION = False;
 N_SPECIES = 2;                                                    # number of diffusing species.WARNING: make sure that the value coincides with the one declared in ecm_output_grid_location_data.cpp, ecm_boundary_concentration_conditions.cpp, ecm_ecm_interaction_grid3D.cpp
 DIFFUSION_COEFF_MULTI = [0.02,0.02]                               # diffusion coefficient in [units^2/s] per specie
 BOUNDARY_CONC_INIT_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],  # initial concentration at each surface (+X,-X,+Y,-Y,+Z,-Z) [units^2/s]. -1.0 means no condition assigned. All agents are assigned 0 by default.
@@ -185,21 +192,43 @@ for i in range(6):
         print(msg_incompatible_conditions.format(i))
         critical_error = True
 
-if (len(DIFFUSION_COEFF_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_INIT_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_FIXED_MULTI) != N_SPECIES):  
-    print('ERROR: you must define a diffusion coefficient and the boundary conditions for each species simulated') 
-    critical_error = True
-# Check diffusion values for numerical stability
-dxdydz = 1.0 / (N - 1)
-for i in range(N_SPECIES):
-    Fi = 3 * (DIFFUSION_COEFF_MULTI[i] * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
-    print('Fi value: {0} for species {1}'.format(Fi,i+1))
-    if Fi > 0.5:
-        print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
+if INCLUDE_DIFFUSION:
+    if (len(DIFFUSION_COEFF_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_INIT_MULTI) != N_SPECIES) or (len(BOUNDARY_CONC_FIXED_MULTI) != N_SPECIES):  
+        print('ERROR: you must define a diffusion coefficient and the boundary conditions for each species simulated') 
         critical_error = True
+    # Check diffusion values for numerical stability
+    dxdydz = 1.0 / (N - 1)
+    for i in range(N_SPECIES):
+        Fi = 3 * (DIFFUSION_COEFF_MULTI[i] * TIME_STEP / (dxdydz * dxdydz)) # this value should be < 0.5
+        print('Fi value: {0} for species {1}'.format(Fi,i+1))
+        if Fi > 0.5:
+            print('ERROR: diffusion problem is ill conditioned (Fi should be < 0.5), check parameters and consider decreasing time step')
+            critical_error = True
+elif INCLUDE_VASCULARIZATION:
+    print('ERROR: Diffusion is deactivated. Vascularization cannot be included')
+    critical_error = True
     
 
 if critical_error:
     quit()
+else:
+    if SAVE_PICKLE:
+        from helper_module import ModelParameterConfig
+        # Store all parameters in a class to be stored in the pickle file
+        model_config = ModelParameterConfig(SAVE_EVERY_N_STEPS, N, TIME_STEP, STEPS, 
+        ECM_K_ELAST, ECM_D_DUMPING, ECM_MASS, ECM_GEL_CONCENTRATION,
+        BOUNDARY_COORDS, BOUNDARY_DISP_RATES,BOUNDARY_DISP_RATES_PARALLEL,
+        POISSON_DIRS,
+        ALLOW_BOUNDARY_ELASTIC_MOVEMENT, 
+        BOUNDARY_STIFFNESS,BOUNDARY_DUMPING,
+        CLAMP_AGENT_TOUCHING_BOUNDARY,ALLOW_AGENT_SLIDING,
+        ECM_ECM_EQUILIBRIUM_DISTANCE,ECM_BOUNDARY_INTERACTION_RADIUS,
+        ECM_BOUNDARY_EQUILIBRIUM_DISTANCE,ECM_ORIENTATION_RATE,
+        OSCILLATORY_SHEAR_ASSAY,OSCILLATORY_AMPLITUDE,OSCILLATORY_FREQ,OSCILLATORY_W,
+        INCLUDE_DIFFUSION,N_SPECIES,DIFFUSION_COEFF_MULTI,
+        BOUNDARY_CONC_INIT_MULTI,BOUNDARY_CONC_FIXED_MULTI,
+        INIT_ECM_CONCENTRATION_VALS,
+        INCLUDE_VASCULARIZATION, INIT_VASCULARIZATION_CONCENTRATION_VALS)
 
 
 #+====================================================================+
@@ -255,6 +284,7 @@ env.newPropertyUInt("STEPS", STEPS);
 # Time increment (seconds)
 env.newPropertyFloat("DELTA_TIME", TIME_STEP);
 # Diffusion coefficient(seconds)
+env.newPropertyUInt("INCLUDE_DIFFUSION", INCLUDE_DIFFUSION);
 env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
 # Number of diffusing species
 env.newPropertyUInt("N_SPECIES", N_SPECIES);
@@ -443,12 +473,14 @@ ecm_agent.newRTCFunctionFile("ecm_boundary_interaction", ecm_boundary_interactio
 ecm_agent.newRTCFunctionFile("ecm_ecm_interaction", ecm_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
 if INCLUDE_VASCULARIZATION:
     ecm_agent.newRTCFunctionFile("ecm_vascularization_interaction", ecm_vascularization_interaction_file).setMessageInput("vascularization_location_message");
-ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
+if INCLUDE_DIFFUSION:
+    ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
 ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
 
 """ 
   Helper functions 
 """
+
 def randomVector3D():
     """
     Generates a random 3D unit vector (direction) with a uniform spherical distribution
@@ -512,7 +544,7 @@ def getFixedVectors3D(n_vectors: int, v_dir: np.array):
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunctionCallback):
   def run(self,FLAMEGPU):
-    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS
+    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -1128,8 +1160,9 @@ class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
             resetMacroProperties(self,FLAMEGPU)
             
 
-ubcm = UpdateBoundaryConcentrationMulti()
-model.addStepFunctionCallback(ubcm)   
+if INCLUDE_DIFFUSION:
+    ubcm = UpdateBoundaryConcentrationMulti()
+    model.addStepFunctionCallback(ubcm)   
      
 sdf = SaveDataToFile()
 model.addStepFunctionCallback(sdf)
@@ -1152,14 +1185,16 @@ if INCLUDE_VASCULARIZATION:
 # Layer #2
 model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
 # Layer #3
-model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
+if INCLUDE_DIFFUSION:
+    odel.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
 # Layer #4
 if INCLUDE_VASCULARIZATION:
     model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
 # Layer #5
 model.newLayer("L5").addAgentFunction("ECM", "ecm_ecm_interaction");
 # Layer #6
-model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
+if INCLUDE_DIFFUSION:
+    model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
 # Layer #7: movement of agents
 model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
 model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
@@ -1498,6 +1533,25 @@ else:
     print("STRAIN OVER TIME")
     print(OSCILLATORY_STRAIN_OVER_TIME)
     print()
+    # Saving pickle
+    if SAVE_PICKLE:
+        import pickle
+        
+        file_name = 'output_data.pickle'
+        file_path = RES_PATH / file_name
+        with open(str(file_path), 'wb') as file:
+            pickle.dump({'BPOS_OVER_TIME': BPOS_OVER_TIME,
+                         'BFORCE_OVER_TIME': BFORCE_OVER_TIME,
+                         'BFORCE_SHEAR_OVER_TIME': BFORCE_SHEAR_OVER_TIME,
+                         'POISSON_RATIO_OVER_TIME': POISSON_RATIO_OVER_TIME,
+                         'OSCILLATORY_STRAIN_OVER_TIME': OSCILLATORY_STRAIN_OVER_TIME,
+                         'model_config': model_config},
+                        file, protocol=pickle.HIGHEST_PROTOCOL)
+                        
+                        
+                        
+                        
+            print('Results successfully saved to {0}'.format(file_path))
     # Plotting
     if SHOW_PLOTS:
         #fig,ax=plt.subplots(2,3)
