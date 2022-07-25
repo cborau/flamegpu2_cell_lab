@@ -59,9 +59,9 @@ FLAMEGPU_DEVICE_FUNCTION void getClosestForceDir(float &dcfx, float &dcfy, float
 	int max_option = 0;
 	
 	if(dfx >= dfy && dfx >= dfz){ 				// x is the main traction direction
-		if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
+		/* if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
 			printf("id: %d -> X is the main dir \n",id);		
-		}
+		} */
 		// Check which of the 4 combinations is closer to ox,oy,oz: dfx,dfy,dfz | dfx,-dfy,dfz | dfx,dfy,-dfz | dfx,-dfy,-dfz 
         cos1 = fabsf(cosf(getAngleBetweenVec(ox,oy,oz,dfx,dfy,dfz)));
 		if (cos1 > max_value){
@@ -96,9 +96,9 @@ FLAMEGPU_DEVICE_FUNCTION void getClosestForceDir(float &dcfx, float &dcfy, float
 			max_option = 4;
 		}
     } else if(dfy >= dfz && dfy >= dfx) { 		// y is the main traction direction
-		if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
+		/* if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
 			printf("id: %d -> Y is the main dir \n",id);		
-		}
+		} */
         cos1 = fabsf(cosf(getAngleBetweenVec(ox,oy,oz,dfx,dfy,dfz)));
 		if (cos1 > max_value){
 			max_value = cos1;
@@ -132,9 +132,9 @@ FLAMEGPU_DEVICE_FUNCTION void getClosestForceDir(float &dcfx, float &dcfy, float
 			max_option = 4;
 		}
     } else{    									// z is the main traction direction
-		if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
+		/* if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
 			printf("id: %d -> Z is the main dir \n",id);		
-		}
+		} */
         cos1 = fabsf(cosf(getAngleBetweenVec(ox,oy,oz,dfx,dfy,dfz)));
 		if (cos1 > max_value){
 			max_value = cos1;
@@ -169,11 +169,35 @@ FLAMEGPU_DEVICE_FUNCTION void getClosestForceDir(float &dcfx, float &dcfy, float
 		}
     }
 	
-	if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
+	/* if ((id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
 		printf("closest dir id: %d , option: %d,  ori  [%g %g %g] \n", id, max_option,dcfx,dcfy,dcfz);		
+	} */
+}
+FLAMEGPU_DEVICE_FUNCTION float getConcKfactor(const float conc) {
+	// returns the factor multiplying the elastic constant depending on gel concentration (fit to experimental data)
+	float factor = conc;
+	// TODO: define linear fit
+	// float m = ?:
+	// float b = ?;
+	// factor = conc*m + b;
+    return factor;
+}
+FLAMEGPU_DEVICE_FUNCTION float getStrainKfactor(const float strain, const float strain_s, const float d_0, const float d_s) {
+	// refer for equations: https://bio.physik.fau.de/publications/Steinwachs%20Nat%20Meth%202016.pdf
+	// returns the factor multiplying the elastic constant depending on fiber strain
+	float factor = 1.0;
+	if (strain < 0.0) {
+	   //factor = expf(strain / d_0);
+	   factor = 1.0;
 	}
-	
-	
+	else if(strain <= strain_s) {
+	   factor = 1.0;
+	}
+	else {
+	   factor = expf((strain - strain_s) / d_s);
+	}
+	//factor = 1.0; //TODO: REMOVE
+	return factor;
 }
 
 
@@ -205,13 +229,16 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   }
   
   // Elastic constant of the ecm 
-  //const float k_elast = FLAMEGPU->getVariable<float>("k_elast");
+  //const float k_elast = FLAMEGPU->getVariable<float>("k_elast");ECM_GEL_CONCENTRATION
   float k_elast = 0.0; //Equivalent elastic constant of two springs in series (agent and message)
   // Elastic constant and orientation of the fibers
+  const float BUCKLING_COEFF_D0 = FLAMEGPU->environment.getProperty<float>("BUCKLING_COEFF_D0");
+  const float STRAIN_STIFFENING_COEFF_DS = FLAMEGPU->environment.getProperty<float>("STRAIN_STIFFENING_COEFF_DS");
+  const float CRITICAL_STRAIN = FLAMEGPU->environment.getProperty<float>("CRITICAL_STRAIN");
   float agent_k_elast = FLAMEGPU->getVariable<float>("k_elast");
   float agent_gel_conc = FLAMEGPU->getVariable<float>("gel_conc");
   
-  agent_k_elast *= agent_gel_conc; // scale the elastic constant with the concentration of gel (1.0 without degradation/deposition)
+  agent_k_elast *= getConcKfactor(agent_gel_conc); // scale the elastic constant with the concentration of gel (1.0 without degradation/deposition)
   
   float agent_orx = FLAMEGPU->getVariable<float>("orx");
   float agent_ory = FLAMEGPU->getVariable<float>("ory");
@@ -302,6 +329,11 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   
+  float dir_max_strain_x = 0.0;
+  float dir_max_strain_y = 0.0;
+  float dir_max_strain_z = 0.0;
+  float max_strain = 0.0;
+  
 
   //printf("Interaction agent %d [%d %d %d]\n", id, agent_grid_i, agent_grid_j, agent_grid_k);
 
@@ -385,7 +417,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 		message_vz = message.getVariable<float>("vz");
 		message_k_elast = message.getVariable<float>("k_elast");
 		message_gel_conc = FLAMEGPU->getVariable<float>("gel_conc");
-		message_k_elast *= message_gel_conc;
+		message_k_elast *= getConcKfactor(message_gel_conc);
 		message_orx = message.getVariable<float>("orx");
 		message_ory = message.getVariable<float>("ory");
 		message_orz = message.getVariable<float>("orz");
@@ -403,15 +435,36 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 			cos_ori_message = EPSILON;
 		}
 		
-		if (id == 99) {
+		if (id == 99999) {
             printf("id1: %d id2: %d cos ori [agent: %g - message: %g] positions [%g %g %g]-[%g %g %g] \n", id, message_id, cos_ori_agent,cos_ori_message,agent_x,agent_y,agent_z,message_x,message_y,message_z);            
         }
-		cos_ori_agent = 1.0;
-		cos_ori_message = 1.0;
 		
-		k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
+		//TODO: REMOVE THIS, JUST FOR TRIALS
+		//cos_ori_agent = 1.0;
+		//cos_ori_message = 1.0;
 
-        cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
+		// compute stiffness depending on fiber orientation
+		k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
+		float strain = (distance - grid_equilibrium_distance) / grid_equilibrium_distance;
+		
+		if (strain > max_strain){
+			max_strain = strain;
+			dir_max_strain_x = dir_x / distance;
+			dir_max_strain_y = dir_y / distance;
+			dir_max_strain_z = dir_z / distance;
+		}
+		/* if ((id == 22)) {
+			printf("id: %d -> message: %d ; k_elast PREV: %g ; strain: %g \n",id, message_id,k_elast, strain );		
+		}  */
+		// multiply it depending on fiber strain (strain-stiffening model)
+		
+        k_elast *= getStrainKfactor(strain, CRITICAL_STRAIN, BUCKLING_COEFF_D0, STRAIN_STIFFENING_COEFF_DS);
+		
+		/* if (id == 22) {
+			printf("id: %d -> message: %d ; k_elast AFTER: %g \n",id, message_id,k_elast);		
+		}  */
+		
+		cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
         cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
         cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
 		
@@ -487,7 +540,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   float force_magnitude = vec3Length(agent_fx_abs,agent_fy_abs,agent_fz_abs);
   
-  if (force_magnitude > EPSILON){
+  if (max_strain > EPSILON){
 	  const float ECM_ORIENTATION_RATE = FLAMEGPU->environment.getProperty<float>("ECM_ORIENTATION_RATE");
 	  float inc_dir_x = 0.0;
 	  float inc_dir_y = 0.0;
@@ -496,7 +549,12 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	  float dir_fy = 0.0;
 	  float dir_fz = 0.0;
 	  //getMaxForceDir(dir_fx,dir_fy,dir_fz,agent_fx_abs,agent_fy_abs,agent_fz_abs);	  
-	  getClosestForceDir(dir_fx,dir_fy,dir_fz,agent_fx_abs,agent_fy_abs,agent_fz_abs,agent_orx,agent_ory,agent_orz,force_magnitude,id);
+	  //getClosestForceDir(dir_fx,dir_fy,dir_fz,agent_fx_abs,agent_fy_abs,agent_fz_abs,agent_orx,agent_ory,agent_orz,force_magnitude,id);
+	  
+	  //TODO: CHECK THIS TRIAL
+	  dir_fx = dir_max_strain_x;
+	  dir_fy = dir_max_strain_y;
+	  dir_fz = dir_max_strain_z;
 	  float cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx,dir_fy,dir_fz));
 	  if (cos_force_ori < 0.0){ // invert direction to find the closest angle between force and orientation directions
 		  dir_fx = -1 * dir_fx;
@@ -505,7 +563,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 	  }
 	  
 	  
-	  if (DEBUG_PRINTING == 0 && (id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
+	  if (DEBUG_PRINTING == 1 && (id == 9 || id == 10 || id == 13 || id == 22 || id == 27 || id == 28)) {
 		printf("force id: %d  ori  [%g %g %g] \n", id, agent_fx,agent_fy,agent_fz);
 		printf("force ABS id: %d  ori  [%g %g %g] \n", id, agent_fx_abs,agent_fy_abs,agent_fz_abs);
 		printf("ORI ANTES id: %d  ori  [%g %g %g] \n", id, agent_orx,agent_ory,agent_orz); 

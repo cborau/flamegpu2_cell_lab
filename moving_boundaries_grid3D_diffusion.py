@@ -55,7 +55,6 @@
 #+--------------------------------------------------------------------+
 #+====================================================================+
 
-# TODO: stablish a force threshold for realigment higher than 0. 
 
 from pyflamegpu import *
 import sys, random, math
@@ -81,9 +80,9 @@ VISUALISATION = True;         # Change to false if pyflamegpu has not been built
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
-SHOW_PLOTS = True;            # Show plots at the end of the simulation
-SAVE_DATA_TO_FILE = True;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 4;       # Affects both the .vtk files and the Dataframes storing boundary data
+SHOW_PLOTS = False;            # Show plots at the end of the simulation
+SAVE_DATA_TO_FILE = False;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_EVERY_N_STEPS = 100;       # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -99,18 +98,18 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.05; # seconds
-STEPS = 400;
+TIME_STEP = 0.01; # seconds
+STEPS = 16000;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 4.0;            #[N/units/kg]
-ECM_D_DUMPING = 1.0;          #[N*s/units/kg]
+ECM_K_ELAST = 20.0;            #[N/units/kg]
+ECM_D_DUMPING = 5.0;          #[N*s/units/kg]
 ECM_MASS = 1.0;               #[dimensionless to make K and D mass dependent]
-ECM_GEL_CONCENTRATION = 1.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
+ECM_GEL_CONCENTRATION = 2.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -134,6 +133,13 @@ OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options 
 OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
 OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
 OSCILLATORY_W = 2 * math.pi * OSCILLATORY_FREQ * TIME_STEP; 
+
+# Fitting parameters for the fiber strain-stiffening phenomena
+# Ref: https://bio.physik.fau.de/publications/Steinwachs%20Nat%20Meth%202016.pdf
+#+--------------------------------------------------------------------+ 
+BUCKLING_COEFF_D0 = 0.1;
+STRAIN_STIFFENING_COEFF_DS = 0.25;
+CRITICAL_STRAIN = 0.1;
 
 # Parallel disp rate values are overrun in oscillatory assays
 #+--------------------------------------------------------------------+
@@ -303,6 +309,9 @@ env.newPropertyFloat("ECM_D_DUMPING", ECM_D_DUMPING);
 env.newPropertyFloat("ECM_MASS", ECM_MASS);
 env.newPropertyFloat("ECM_ORIENTATION_RATE",ECM_ORIENTATION_RATE);
 env.newPropertyFloat("ECM_GEL_CONCENTRATION",ECM_GEL_CONCENTRATION);
+env.newPropertyFloat("BUCKLING_COEFF_D0",BUCKLING_COEFF_D0);
+env.newPropertyFloat("STRAIN_STIFFENING_COEFF_DS",STRAIN_STIFFENING_COEFF_DS);
+env.newPropertyFloat("CRITICAL_STRAIN",CRITICAL_STRAIN);
 
 
 # ------------------------------------------------------
@@ -490,6 +499,7 @@ def randomVector3D():
     (x,y,z) : tuple
         Coordinates of the vector.
     """
+    np.random.seed()
     phi = np.random.uniform(0, np.pi * 2)
     costheta = np.random.uniform(-1, 1)
     theta = np.arccos(costheta)
