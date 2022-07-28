@@ -240,6 +240,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   agent_k_elast *= getConcKfactor(agent_gel_conc); // scale the elastic constant with the concentration of gel (1.0 without degradation/deposition)
   
+  int INCLUDE_FIBER_ALIGNMENT = FLAMEGPU->environment.getProperty<int>("INCLUDE_FIBER_ALIGNMENT");
   float agent_orx = FLAMEGPU->getVariable<float>("orx");
   float agent_ory = FLAMEGPU->getVariable<float>("ory");
   float agent_orz = FLAMEGPU->getVariable<float>("orz");
@@ -439,9 +440,11 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
             printf("id1: %d id2: %d cos ori [agent: %g - message: %g] positions [%g %g %g]-[%g %g %g] \n", id, message_id, cos_ori_agent,cos_ori_message,agent_x,agent_y,agent_z,message_x,message_y,message_z);            
         }
 		
-		//TODO: REMOVE THIS, JUST FOR TRIALS
-		//cos_ori_agent = 1.0;
-		//cos_ori_message = 1.0;
+		if (INCLUDE_FIBER_ALIGNMENT != 1){
+			cos_ori_agent = 1.0;
+			cos_ori_message = 1.0;
+		}
+		
 
 		// compute stiffness depending on fiber orientation
 		k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
@@ -540,7 +543,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
   
   float force_magnitude = vec3Length(agent_fx_abs,agent_fy_abs,agent_fz_abs);
   
-  if (max_strain > EPSILON){
+  if ((max_strain > EPSILON) && (INCLUDE_FIBER_ALIGNMENT == 1)){
 	  const float ECM_ORIENTATION_RATE = FLAMEGPU->environment.getProperty<float>("ECM_ORIENTATION_RATE");
 	  float inc_dir_x = 0.0;
 	  float inc_dir_y = 0.0;
@@ -570,7 +573,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
 		printf("dir_f ANTES id: %d  dirf  [%g %g %g] \n", id, dir_fx,dir_fy,dir_fz); 		
 	  }
 	  
-	  //force_magnitude = 1.0; //TODO: REMOVE THIS. DEBUGGING
+	  //TODO: MAKE IT DEPENDENT ON MAXIMUM STRAIN INSTEAD
 	  // Multiply again by force magnitude to make orientation rate force-dependent
 	  dir_fx *= force_magnitude;
 	  dir_fy *= force_magnitude;

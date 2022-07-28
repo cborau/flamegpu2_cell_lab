@@ -8,7 +8,8 @@ class ModelParameterConfig:
     boundary_stiffness:list,boundary_dumping:list,
     clamp_agent_touching_boundary:list,allow_agent_sliding:list,
     ecm_ecm_equilibrium_distance:float,ecm_boundary_interaction_radius:float,
-    ecm_boundary_equilibrium_distance:float,ecm_orientation_rate:float,
+    ecm_boundary_equilibrium_distance:float,
+    include_fiber_alignment:int,ecm_orientation_rate:float,
     oscillatory_shear_assay:bool,oscillatory_amplitude:float,oscillatory_freq:float,oscillatory_w:float,
     include_diffusion:bool,n_species:int,diffusion_coeff_multi:float,
     boundary_conc_init_multi:list,boundary_conc_fixed_multi:list,
@@ -35,6 +36,7 @@ class ModelParameterConfig:
     self.ECM_ECM_EQUILIBRIUM_DISTANCE = ecm_ecm_equilibrium_distance
     self.ECM_BOUNDARY_INTERACTION_RADIUS = ecm_boundary_interaction_radius
     self.ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = ecm_boundary_equilibrium_distance
+    self.INCLUDE_FIBER_ALIGNMENT = include_fiber_alignment
     self.ECM_ORIENTATION_RATE = ecm_orientation_rate
     self.OSCILLATORY_SHEAR_ASSAY = oscillatory_shear_assay
     self.OSCILLATORY_AMPLITUDE = oscillatory_amplitude

@@ -81,8 +81,8 @@ DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
 SHOW_PLOTS = False;            # Show plots at the end of the simulation
-SAVE_DATA_TO_FILE = False;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 100;       # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_DATA_TO_FILE = True;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
+SAVE_EVERY_N_STEPS = 200;       # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -103,10 +103,10 @@ STEPS = 16000;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 20.0;            #[N/units/kg]
-ECM_D_DUMPING = 5.0;          #[N*s/units/kg]
+ECM_K_ELAST = 20;            #[N/units/kg]
+ECM_D_DUMPING = 4;          #[N*s/units/kg]
 ECM_MASS = 1.0;               #[dimensionless to make K and D mass dependent]
-ECM_GEL_CONCENTRATION = 2.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
+ECM_GEL_CONCENTRATION = 1.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
 BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
@@ -125,6 +125,7 @@ print("ECM_ECM_EQUILIBRIUM_DISTANCE [units]: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
 ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
+INCLUDE_FIBER_ALIGNMENT = True; 
 ECM_ORIENTATION_RATE = 0.1 / (ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);   #[1/seconds]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces 
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
@@ -229,7 +230,8 @@ else:
         BOUNDARY_STIFFNESS,BOUNDARY_DUMPING,
         CLAMP_AGENT_TOUCHING_BOUNDARY,ALLOW_AGENT_SLIDING,
         ECM_ECM_EQUILIBRIUM_DISTANCE,ECM_BOUNDARY_INTERACTION_RADIUS,
-        ECM_BOUNDARY_EQUILIBRIUM_DISTANCE,ECM_ORIENTATION_RATE,
+        ECM_BOUNDARY_EQUILIBRIUM_DISTANCE,
+        INCLUDE_FIBER_ALIGNMENT,ECM_ORIENTATION_RATE,
         OSCILLATORY_SHEAR_ASSAY,OSCILLATORY_AMPLITUDE,OSCILLATORY_FREQ,OSCILLATORY_W,
         INCLUDE_DIFFUSION,N_SPECIES,DIFFUSION_COEFF_MULTI,
         BOUNDARY_CONC_INIT_MULTI,BOUNDARY_CONC_FIXED_MULTI,
@@ -307,6 +309,7 @@ env.newPropertyFloat("ECM_ECM_EQUILIBRIUM_DISTANCE", ECM_ECM_EQUILIBRIUM_DISTANC
 env.newPropertyFloat("ECM_K_ELAST", ECM_K_ELAST); # initial K_ELAST for agents
 env.newPropertyFloat("ECM_D_DUMPING", ECM_D_DUMPING);
 env.newPropertyFloat("ECM_MASS", ECM_MASS);
+env.newPropertyUInt("INCLUDE_FIBER_ALIGNMENT", INCLUDE_FIBER_ALIGNMENT);
 env.newPropertyFloat("ECM_ORIENTATION_RATE",ECM_ORIENTATION_RATE);
 env.newPropertyFloat("ECM_GEL_CONCENTRATION",ECM_GEL_CONCENTRATION);
 env.newPropertyFloat("BUCKLING_COEFF_D0",BUCKLING_COEFF_D0);
@@ -554,7 +557,7 @@ def getFixedVectors3D(n_vectors: int, v_dir: np.array):
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunctionCallback):
   def run(self,FLAMEGPU):
-    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS
+    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS, INCLUDE_FIBER_ALIGNMENT
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -635,10 +638,12 @@ class initAgentPopulations(pyflamegpu.HostFunctionCallback):
     coords_x = np.linspace(BOUNDARY_COORDS[1] + offset[1], BOUNDARY_COORDS[0] - offset[0], agents_per_dir[0]);
     coords_y = np.linspace(BOUNDARY_COORDS[3] + offset[3], BOUNDARY_COORDS[2] - offset[2], agents_per_dir[1]);
     coords_z = np.linspace(BOUNDARY_COORDS[5] + offset[5], BOUNDARY_COORDS[4] - offset[4], agents_per_dir[2]);
-    orientations = getRandomVectors3D(populationSize)
-    # fixed_dir = np.zeros((1,3));
-    # fixed_dir[0,1] = 1.0;
-    # orientations = getFixedVectors3D(populationSize,fixed_dir);
+    if INCLUDE_FIBER_ALIGNMENT:
+        orientations = getRandomVectors3D(populationSize)
+    else:
+        fixed_dir = np.zeros((1,3));
+        fixed_dir[0,1] = 1.0;
+        orientations = getFixedVectors3D(populationSize,fixed_dir)
     count = -1;
     i = -1;
     j = -1;
