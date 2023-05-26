@@ -10,6 +10,7 @@ class ModelParameterConfig:
     ecm_ecm_equilibrium_distance:float,ecm_boundary_interaction_radius:float,
     ecm_boundary_equilibrium_distance:float,
     include_fiber_alignment:int,ecm_orientation_rate:float,
+    buckling_coeff_d0:float,strain_stiffening_coeff_ds:float,critical_strain:float,
     oscillatory_shear_assay:bool,oscillatory_amplitude:float,oscillatory_freq:float,oscillatory_w:float,
     include_diffusion:bool,n_species:int,diffusion_coeff_multi:float,
     boundary_conc_init_multi:list,boundary_conc_fixed_multi:list,
@@ -38,6 +39,9 @@ class ModelParameterConfig:
     self.ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = ecm_boundary_equilibrium_distance
     self.INCLUDE_FIBER_ALIGNMENT = include_fiber_alignment
     self.ECM_ORIENTATION_RATE = ecm_orientation_rate
+    self.BUCKLING_COEFF_D0 = buckling_coeff_d0
+    self.STRAIN_STIFFENING_COEFF_DS = strain_stiffening_coeff_ds
+    self.CRITICAL_STRAIN = critical_strain
     self.OSCILLATORY_SHEAR_ASSAY = oscillatory_shear_assay
     self.OSCILLATORY_AMPLITUDE = oscillatory_amplitude
     self.OSCILLATORY_FREQ = oscillatory_freq
@@ -50,6 +54,11 @@ class ModelParameterConfig:
     self.INIT_ECM_CONCENTRATION_VALS = init_ecm_concentration_vals
     self.INCLUDE_VASCULARIZATION = include_vascularization    
     self.INIT_VASCULARIZATION_CONCENTRATION_VALS = init_vascularization_concentration_vals
+
+  def print_all(self):
+    attributes = vars(self)
+    for attribute, value in attributes.items():
+      print(f"{attribute}: {value}")
 
 
 

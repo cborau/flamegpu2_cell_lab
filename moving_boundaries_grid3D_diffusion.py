@@ -80,9 +80,9 @@ VISUALISATION = True;         # Change to false if pyflamegpu has not been built
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
-SHOW_PLOTS = False;            # Show plots at the end of the simulation
+SHOW_PLOTS = False;           # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = True;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 200;       # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 200;     # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -232,6 +232,7 @@ else:
         ECM_ECM_EQUILIBRIUM_DISTANCE,ECM_BOUNDARY_INTERACTION_RADIUS,
         ECM_BOUNDARY_EQUILIBRIUM_DISTANCE,
         INCLUDE_FIBER_ALIGNMENT,ECM_ORIENTATION_RATE,
+        BUCKLING_COEFF_D0, STRAIN_STIFFENING_COEFF_DS, CRITICAL_STRAIN,
         OSCILLATORY_SHEAR_ASSAY,OSCILLATORY_AMPLITUDE,OSCILLATORY_FREQ,OSCILLATORY_W,
         INCLUDE_DIFFUSION,N_SPECIES,DIFFUSION_COEFF_MULTI,
         BOUNDARY_CONC_INIT_MULTI,BOUNDARY_CONC_FIXED_MULTI,
