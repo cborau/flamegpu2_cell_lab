@@ -99,7 +99,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.01; # seconds
-STEPS = 16000;
+STEPS = 160;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -1174,7 +1174,7 @@ class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
                 for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
                     BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0               
             resetMacroProperties(self,FLAMEGPU)
-            
+
 
 if INCLUDE_DIFFUSION:
     ubcm = UpdateBoundaryConcentrationMulti()
@@ -1403,135 +1403,32 @@ else:
 if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
     visualisation.join();
 
+print("--- EXECUTION TIME: %s seconds ---" % (time.time() - start_time))
 
+incL_dir1 = (BPOS_OVER_TIME.iloc[:, POISSON_DIRS[0] * 2] - BPOS_OVER_TIME.iloc[:, POISSON_DIRS[0] * 2 + 1]) - (
+        BPOS_OVER_TIME.iloc[0, POISSON_DIRS[0] * 2] - BPOS_OVER_TIME.iloc[0, POISSON_DIRS[0] * 2 + 1])
+incL_dir2 = (BPOS_OVER_TIME.iloc[:, POISSON_DIRS[1] * 2] - BPOS_OVER_TIME.iloc[:, POISSON_DIRS[1] * 2 + 1]) - (
+        BPOS_OVER_TIME.iloc[0, POISSON_DIRS[1] * 2] - BPOS_OVER_TIME.iloc[0, POISSON_DIRS[1] * 2 + 1])
 
-# Deal with logs
-if ENSEMBLE:
-    logs = simulation.getLogs();
-else:
-    logs = simulation.getRunLog();
+print(incL_dir1)
+print('/')
+print(incL_dir2)
 
+POISSON_RATIO_OVER_TIME = -1 * incL_dir1 / incL_dir2
 
-if ENSEMBLE:
-    agent_counts = [None]*ENSEMBLE_RUNS   
-    current_id = [None]*ENSEMBLE_RUNS
-    # Read logs
-    for i in range(len(logs)):
-      sl = logs[i].getStepLog();
-      agent_counts[i] = ["ensemble_run_"+str(i)+"_ecm"];
-      ecm_force_mean[i] = ["ensemble_run_"+str(i)];
-      ecm_force_std[i] = ["ensemble_run_"+str(i)];
-      current_id[i] = ["ensemble_run_"+str(i)];
-      for step in sl:
-        # Collect step data
-        ecm_agents = step.getAgent("ECM");        
-        current_id[i].append(step.getEnvironmentPropertyUInt("CURRENT_ID"));
-        # Collect agent data from step
-        ecm_force_mean[i][0].append(ecm_agents.getMean("fx"));
-        ecm_force_mean[i][1].append(ecm_agents.getMean("fy"));
-        ecm_force_mean[i][2].append(ecm_agents.getMean("fz"));
-        ecm_force_std[i][0].append(ecm_agents.getStandardDev("fx"));
-        ecm_force_std[i][1].append(ecm_agents.getStandardDev("fy"));
-        ecm_force_std[i][2].append(ecm_agents.getStandardDev("fz"));
-        agent_counts[i][0].append(ecm_agents.getCount());
-
-    print()
-
-
-    #Print warning data
-    print("Agent counts per step per ensemble run")
-    for j in range(len(agent_counts)):
-      for k in range(len(agent_counts[j])):
-        print(agent_counts[j][k])
-    print()
-   
-    """
-      Boid graph generation for future reference
-    """
-    # Generate graphs 
-    # for j in range(ENSEMBLE_RUNS):
-    #     # Plot 3d graph of average flock position over simulation for individual model run
-    #     fig = plt.figure(figsize=(8,8));
-    #     ax = fig.gca(projection='3d');
-    #     ax.set_xlabel("Model environment x");
-    #     ax.set_ylabel("Model environment y");
-    #     ax.set_zlabel("Model environment z");
-    #     fig.suptitle("Ensemble run "+str(j)+" boids mean flock positions",fontsize=16);
-    #     label = "Boids mean flock position, ensemble run "+str(j);
-    #     fname = "average_flock_positions_run"+str(j)+".png";
-    #     # Position start and finish flock position text
-    #     for k in text_pos[j]:
-    #         ax.text(k[0],k[1],k[2],k[3],None);
-    #     ax.plot(positions_mean[j][0], positions_mean[j][1], positions_mean[j][2], label=label);
-    #     ax.set_xlim3d([-1.0,1.0]);
-    #     ax.set_ylim3d([-1.0,1.0]);
-    #     ax.set_zlim3d([-1.0,1.0]);
-    #     ax.legend();
-    #     plt.savefig(fname,format='png');
-    #     plt.close(fig);
-
-    #     # Plot graphs for average of each fx, fy, and fz with standard deviation error bars
-    #     steplist = range(STEPS);
-    #     fig,(axx,axy,axz) = plt.subplots(1,3, figsize=(21,6));
-    #     fig.suptitle("Ensemble run "+str(j)+" mean boid velocities with std errorbar",fontsize=16);
-    #     velfname = "mean_velocities_run"+str(j)+".png";
-    #     axx.errorbar(steplist,velocities_mean[j][0],yerr=velocities_std[j][0],elinewidth=0.5,capsize=1.0);
-    #     axx.set_xlabel("Simulation step");
-    #     axx.set_ylabel("Boid agents average fx");
-    #     axy.errorbar(steplist,velocities_mean[j][1],yerr=velocities_std[j][1],elinewidth=0.5,capsize=1.0);
-    #     axy.set_xlabel("Simulation step");
-    #     axy.set_ylabel("Boid agents average fy");
-    #     axz.errorbar(steplist,velocities_mean[j][2],yerr=velocities_std[j][2],elinewidth=0.5,capsize=1.0);
-    #     axz.set_xlabel("Simulation step");
-    #     axz.set_ylabel("Boid agents average fz");
-    #     plt.savefig(velfname,format='png');
-    #     plt.close(fig);
-
-    # # Plot every model in esemble's average flock position over simulation on the same 3d graph
-    # fig = plt.figure(figsize=(12,12));
-    # fig.suptitle("Ensemble Boids mean flock positions",fontsize=16);
-    # ax = fig.gca(projection='3d');
-    # ax.set_xlabel("Model environment x");
-    # ax.set_ylabel("Model environment y");
-    # ax.set_zlabel("Model environment z");
-    # fname = "ensemble_average_flock_positions.png";
-    # ## Plot start and finish text for each flock path ---VERY CLUTTERED---
-    # # for i in text_pos:
-    # #     for k in i:
-    # #         ax.text(k[0],k[1],k[2],k[3],'x');
-    # jcount = 0;
-    # for j in positions_mean:
-    #     label1 = "Run "+str(jcount);
-    #     ax.plot(j[0], j[1], j[2], label=label1);
-    #     jcount+=1;
-    # #ax.set_xlim3d([-1.0,1.0]);
-    # #ax.set_ylim3d([-1.0,1.0]);
-    # #ax.set_zlim3d([-1.0,1.0]);
-    # ax.legend();
-    # plt.savefig(fname,format='png');
-    # plt.close(fig);
-
-else:
-    print("--- EXECUTION TIME: %s seconds ---" % (time.time() - start_time))
-    steps = logs.getStepLog();
-    ecm_agent_counts = [None]*len(steps)
-    BFORCE = make_dataclass("BFORCE", [("fxpos", float), ("fxneg", float), ("fypos", float), ("fyneg", float), ("fzpos", float), ("fzneg", float)])
-    BFORCE_SHEAR = make_dataclass("BFORCE_SHEAR", [("fxpos_y", float), ("fxpos_z", float), ("fxneg_y", float), ("fxneg_z", float),
-                                                   ("fypos_x", float), ("fypos_z", float), ("fyneg_x", float), ("fyneg_z", float),
-                                                   ("fzpos_x", float), ("fzpos_y", float), ("fzneg_x", float), ("fzneg_y", float)])
-    
-        
-    incL_dir1 = (BPOS_OVER_TIME.iloc[:,POISSON_DIRS[0]*2] - BPOS_OVER_TIME.iloc[:,POISSON_DIRS[0]*2 + 1]) - (BPOS_OVER_TIME.iloc[0,POISSON_DIRS[0]*2] -  BPOS_OVER_TIME.iloc[0,POISSON_DIRS[0]*2 + 1]) 
-    incL_dir2 = (BPOS_OVER_TIME.iloc[:,POISSON_DIRS[1]*2] - BPOS_OVER_TIME.iloc[:,POISSON_DIRS[1]*2 + 1]) - (BPOS_OVER_TIME.iloc[0,POISSON_DIRS[1]*2] -  BPOS_OVER_TIME.iloc[0,POISSON_DIRS[1]*2 + 1])
-
-    print(incL_dir1)
-    print('/')
-    print(incL_dir2)
-        
-    POISSON_RATIO_OVER_TIME = -1 * incL_dir1 / incL_dir2
-
+def manageLogs(steps, is_ensemble, idx):
+    global SAVE_EVERY_N_STEPS, SAVE_PICKLE, SHOW_PLOTS, RES_PATH, model_config
+    global BPOS_OVER_TIME, BFORCE_OVER_TIME, BFORCE_SHEAR_OVER_TIME, POISSON_RATIO_OVER_TIME, OSCILLATORY_STRAIN_OVER_TIME
+    ecm_agent_counts = [None] * len(steps)
     counter = 0;
-    for step in steps:        
+    BFORCE = make_dataclass("BFORCE",
+                            [("fxpos", float), ("fxneg", float), ("fypos", float), ("fyneg", float), ("fzpos", float),
+                             ("fzneg", float)])
+    BFORCE_SHEAR = make_dataclass("BFORCE_SHEAR",
+                                  [("fxpos_y", float), ("fxpos_z", float), ("fxneg_y", float), ("fxneg_z", float),
+                                   ("fypos_x", float), ("fypos_z", float), ("fyneg_x", float), ("fyneg_z", float),
+                                   ("fzpos_x", float), ("fzpos_y", float), ("fzneg_x", float), ("fzneg_y", float)])
+    for step in steps:
         stepcount = step.getStepCount();
         if stepcount % SAVE_EVERY_N_STEPS == 0 or stepcount == 1:
             ecm_agents = step.getAgent("ECM");
@@ -1556,44 +1453,46 @@ else:
             f_bz_neg_y = ecm_agents.getSumFloat("f_bz_neg_y")
 
             step_bforce = pd.DataFrame([BFORCE(f_bx_pos, f_bx_neg, f_by_pos, f_by_neg, f_bz_pos, f_bz_neg)])
-            step_bforce_shear = pd.DataFrame([BFORCE_SHEAR(f_bx_pos_y, f_bx_pos_z,f_bx_neg_y,f_bx_neg_z,
-                                                           f_by_pos_x, f_by_pos_z,f_by_neg_x,f_by_neg_z,
-                                                           f_bz_pos_x, f_bz_pos_y,f_bz_neg_x,f_bz_neg_y)])
+            step_bforce_shear = pd.DataFrame([BFORCE_SHEAR(f_bx_pos_y, f_bx_pos_z, f_bx_neg_y, f_bx_neg_z,
+                                                           f_by_pos_x, f_by_pos_z, f_by_neg_x, f_by_neg_z,
+                                                           f_bz_pos_x, f_bz_pos_y, f_bz_neg_x, f_bz_neg_y)])
             if counter == 0:
                 BFORCE_OVER_TIME = pd.DataFrame([BFORCE(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
-                BFORCE_SHEAR_OVER_TIME = pd.DataFrame([BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
+                BFORCE_SHEAR_OVER_TIME = pd.DataFrame(
+                    [BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
             else:
-                #BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True) # deprecated
+                # BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True) # deprecated
                 BFORCE_OVER_TIME = pd.concat([BFORCE_OVER_TIME, step_bforce], ignore_index=True)
-                #BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True) # deprecated
+                # BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True) # deprecated
                 BFORCE_SHEAR_OVER_TIME = pd.concat([BFORCE_SHEAR_OVER_TIME, step_bforce_shear], ignore_index=True)
-            counter+=1;
-    print()
-    print("============================")
-    print("BOUNDARY POSITIONS OVER TIME")
-    print(BPOS_OVER_TIME)
-    print()
-    print("============================")
-    print("BOUNDARY FORCES OVER TIME")
-    print(BFORCE_OVER_TIME)
-    print()
-    print("============================")
-    print("BOUNDARY SHEAR FORCES OVER TIME")
-    print(BFORCE_SHEAR_OVER_TIME)
-    print()
-    print("============================")
-    print("POISSON RATIO OVER TIME")
-    print(POISSON_RATIO_OVER_TIME)
-    print()
-    print("============================")
-    print("STRAIN OVER TIME")
-    print(OSCILLATORY_STRAIN_OVER_TIME)
-    print()
+            counter += 1;
+    if not is_ensemble:
+        print()
+        print("============================")
+        print("BOUNDARY POSITIONS OVER TIME")
+        print(BPOS_OVER_TIME)
+        print()
+        print("============================")
+        print("BOUNDARY FORCES OVER TIME")
+        print(BFORCE_OVER_TIME)
+        print()
+        print("============================")
+        print("BOUNDARY SHEAR FORCES OVER TIME")
+        print(BFORCE_SHEAR_OVER_TIME)
+        print()
+        print("============================")
+        print("POISSON RATIO OVER TIME")
+        print(POISSON_RATIO_OVER_TIME)
+        print()
+        print("============================")
+        print("STRAIN OVER TIME")
+        print(OSCILLATORY_STRAIN_OVER_TIME)
+        print()
     # Saving pickle
     if SAVE_PICKLE:
         import pickle
-        
-        file_name = 'output_data.pickle'
+
+        file_name = f'output_data_{idx}.pickle'
         file_path = RES_PATH / file_name
         with open(str(file_path), 'wb') as file:
             pickle.dump({'BPOS_OVER_TIME': BPOS_OVER_TIME,
@@ -1603,38 +1502,35 @@ else:
                          'OSCILLATORY_STRAIN_OVER_TIME': OSCILLATORY_STRAIN_OVER_TIME,
                          'model_config': model_config},
                         file, protocol=pickle.HIGHEST_PROTOCOL)
-                        
-                        
-                        
-                        
+
             print('Results successfully saved to {0}'.format(file_path))
     # Plotting
-    if SHOW_PLOTS:
-        #fig,ax=plt.subplots(2,3)
+    if SHOW_PLOTS and not is_ensemble:
+        # fig,ax=plt.subplots(2,3)
         fig = plt.figure()
-        gs = fig.add_gridspec(2,3)
+        gs = fig.add_gridspec(2, 3)
         ax1 = fig.add_subplot(gs[0, 0])
         ax2 = fig.add_subplot(gs[0, 1])
         ax3 = fig.add_subplot(gs[:, 2])
         ax4 = fig.add_subplot(gs[1, 0])
         ax5 = fig.add_subplot(gs[1, 1])
-        #BPOS_OVER_TIME.plot()
+        # BPOS_OVER_TIME.plot()
 
-        BPOS_OVER_TIME.plot(ax = ax1)
-        #ax = df['size'].plot(secondary_y=True, color='k', marker='o')
+        BPOS_OVER_TIME.plot(ax=ax1)
+        # ax = df['size'].plot(secondary_y=True, color='k', marker='o')
         ax1.set_xlabel('time step')
         ax1.set_ylabel('pos')
-        BFORCE_OVER_TIME.plot(ax = ax2)
+        BFORCE_OVER_TIME.plot(ax=ax2)
         ax2.set_ylabel('normal force')
         ax2.set_xlabel('time step')
-        BFORCE_SHEAR_OVER_TIME.plot(ax = ax3)
+        BFORCE_SHEAR_OVER_TIME.plot(ax=ax3)
         ax3.set_ylabel('shear force')
         ax3.set_xlabel('time step')
-        POISSON_RATIO_OVER_TIME.plot(ax = ax4)
+        POISSON_RATIO_OVER_TIME.plot(ax=ax4)
         ax4.set_ylabel('poisson ratio')
         ax4.set_xlabel('time step')
         plt.sca(ax5)
-        plt.plot(BPOS_OVER_TIME['ypos'] - 0.5,  BFORCE_OVER_TIME['fypos'])
+        plt.plot(BPOS_OVER_TIME['ypos'] - 0.5, BFORCE_OVER_TIME['fypos'])
         ax5.set_ylabel('normal force')
         ax5.set_xlabel('disp')
 
@@ -1644,12 +1540,14 @@ else:
             OSCILLATORY_STRAIN_OVER_TIME.plot()
             fig2 = plt.figure()
             colors = np.arange(0, STEPS + 1, 1).tolist()
-            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'].abs(), marker='o', c=colors, alpha=0.3, cmap='viridis')
+            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(), BFORCE_SHEAR_OVER_TIME['fypos_x'].abs(),
+                        marker='o', c=colors, alpha=0.3, cmap='viridis')
             plt.xlabel('strain')
             plt.ylabel('shear force');
             fig3 = plt.figure()
             colors = np.arange(0, STEPS + 1, 1).tolist()
-            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(),  BFORCE_SHEAR_OVER_TIME['fypos_x'], marker='o', c=colors, alpha=0.3, cmap='viridis')
+            plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(), BFORCE_SHEAR_OVER_TIME['fypos_x'], marker='o',
+                        c=colors, alpha=0.3, cmap='viridis')
             plt.xlabel('strain')
             plt.ylabel('shear force');
 
@@ -1662,9 +1560,18 @@ else:
             ax41.set_xlabel('steps')
             ax41.set_ylabel('strain', color='g')
             ax42.set_ylabel('shear force', color='b')
-            ax42.set_ylim(-35,35)
-
+            ax42.set_ylim(-35, 35)
 
         plt.show()
-        #for j in range(len(steps)):
-        #  print("step",j,"ECM",ecm_agent_counts[j]) 
+
+# Deal with logs
+if ENSEMBLE:
+    logs = simulation.getLogs();
+    for i in range(len(logs)):
+        steps = logs[i].getStepLog();
+        manageLogs(steps, ENSEMBLE, i)
+else:
+    logs = simulation.getRunLog();
+    steps = logs.getStepLog();
+    manageLogs(steps, ENSEMBLE, 0)
+
