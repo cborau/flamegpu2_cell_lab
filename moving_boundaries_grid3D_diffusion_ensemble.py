@@ -99,7 +99,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.01; # seconds
-STEPS = 160;
+STEPS = 16000;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -556,7 +556,7 @@ def getFixedVectors3D(n_vectors: int, v_dir: np.array):
   Population initialisation functions
 """
 # This class is used to ensure that corner agents are assigned the first 8 ids
-class initAgentPopulations(pyflamegpu.HostFunctionCallback):
+class initAgentPopulations(pyflamegpu.HostFunction):
   def run(self,FLAMEGPU):
     global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS, INCLUDE_FIBER_ALIGNMENT
     # BOUNDARY CORNERS
@@ -755,7 +755,7 @@ def resetMacroProperties(self,FLAMEGPU):
     return
     
 # This class is used to reset the MacroProperties to the values stored in the global variables
-class initMacroProperties(pyflamegpu.HostFunctionCallback):
+class initMacroProperties(pyflamegpu.HostFunction):
   def run(self,FLAMEGPU):
     resetMacroProperties(self,FLAMEGPU)
     return
@@ -764,16 +764,15 @@ class initMacroProperties(pyflamegpu.HostFunctionCallback):
 # Add function callback to INIT functions for population generation
 initialAgentPopulation = initAgentPopulations();
 initialMacroProperties = initMacroProperties();
-model.addInitFunctionCallback(initialAgentPopulation);
-model.addInitFunctionCallback(initialMacroProperties);
+model.addInitFunction(initialAgentPopulation);
+model.addInitFunction(initialMacroProperties);
 
 
 """
   STEP FUNCTIONS
 """
-stepCounter = 1
 
-class MoveBoundaries(pyflamegpu.HostFunctionCallback):
+class MoveBoundaries(pyflamegpu.HostFunction):
      """
      pyflamegpu requires step functions to be a class which extends the StepFunction base class.
      This class must extend the handle function
@@ -791,7 +790,7 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
 
      # Override C++ method: virtual void run(FLAMEGPU_HOST_API*);
      def run(self, FLAMEGPU):
-         global stepCounter
+         stepCounter = FLAMEGPU.getStepCounter() + 1;
          global BOUNDARY_COORDS, BOUNDARY_DISP_RATES, ALLOW_BOUNDARY_ELASTIC_MOVEMENT, BOUNDARY_STIFFNESS, BOUNDARY_DUMPING, BPOS_OVER_TIME
          global CLAMP_AGENT_TOUCHING_BOUNDARY, OSCILLATORY_SHEAR_ASSAY, OSCILLATORY_AMPLITUDE, OSCILLATORY_W, OSCILLATORY_STRAIN_OVER_TIME
          global DEBUG_PRINTING, PAUSE_EVERY_STEP, TIME_STEP
@@ -888,10 +887,9 @@ class MoveBoundaries(pyflamegpu.HostFunctionCallback):
 
 
          #print ("End of step: ", stepCounter)
-         stepCounter += 1
 
 
-class SaveDataToFile(pyflamegpu.HostFunctionCallback):
+class SaveDataToFile(pyflamegpu.HostFunction):
     def __init__(self):
         global N, N_VASCULARIZATION_POINTS
         super().__init__()
@@ -942,9 +940,11 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
  
     def run(self, FLAMEGPU):
         global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
-        global RES_PATH        
-        global stepCounter, fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
-
+        global RES_PATH, ENSEMBLE
+        global fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
+        global BUCKLING_COEFF_D0, STRAIN_STIFFENING_COEFF_DS, CRITICAL_STRAIN
+        stepCounter = FLAMEGPU.getStepCounter() + 1;
+        
         if SAVE_DATA_TO_FILE:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 
@@ -965,7 +965,13 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                             file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
                  
                 file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
-                file_path = RES_PATH / file_name
+                if ENSEMBLE:
+                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN.3f}"
+                    # Combine the base directory with the current directory name
+                    file_path = RES_PATH / dir_name / file_name
+                else:
+                    file_path = RES_PATH / file_name
+
                 agent = FLAMEGPU.agent("ECM");
                 # reaction forces, thus, opposite to agent-applied forces
                 sum_bx_pos = -agent.sumFloat("f_bx_pos") 
@@ -1161,11 +1167,12 @@ class SaveDataToFile(pyflamegpu.HostFunctionCallback):
                 print ("=================================")
 
 
-class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
+class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunction):
     def __init__(self):
         super().__init__()
     def run(self, FLAMEGPU):    
-        global stepCounter, BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
+        global BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
+        stepCounter = FLAMEGPU.getStepCounter() + 1;
         if stepCounter == 2: # after first step BOUNDARY_CONC_INIT_MULTI is removed (set to -1.0) and BOUNDARY_CONC_FIXED_MULTI prevails
             print ("====== CONCENTRATION MULTI BOUNDARY CONDITIONS SET  ======")                 
             print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT_MULTI)
@@ -1178,13 +1185,13 @@ class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunctionCallback):
 
 if INCLUDE_DIFFUSION:
     ubcm = UpdateBoundaryConcentrationMulti()
-    model.addStepFunctionCallback(ubcm)   
+    model.addStepFunction(ubcm)   
      
 sdf = SaveDataToFile()
-model.addStepFunctionCallback(sdf)
+model.addStepFunction(sdf)
 
 mb = MoveBoundaries()
-model.addStepFunctionCallback(mb)
+model.addStepFunction(mb)
 
 """
   END OF STEP FUNCTIONS
@@ -1266,8 +1273,9 @@ if ENSEMBLE:
   """
   Create Run Plan Vector
   """   
-  run_plan_vector = pyflamegpu.RunPlanVec(model, ENSEMBLE_RUNS);
+  run_plan_vector = pyflamegpu.RunPlanVector(model, ENSEMBLE_RUNS);
   run_plan_vector.setSteps(env.getPropertyUInt("STEPS"));
+  print(env.getPropertyUInt("STEPS"))
   simulation_seed = random.randint(0,99999);
   run_plan_vector.setRandomSimulationSeed(simulation_seed,1000);
   simulation = pyflamegpu.CUDAEnsemble(model);
@@ -1280,7 +1288,8 @@ if ENSEMBLE:
   run_control = pyflamegpu.RunPlan(model)
 
   # Ensure that repeated runs use the same Random values within the RunPlans
-  run_control.setRandomPropertySeed(34523)
+  #run_control.setRandomPropertySeed(34523) # This method only exists at the vector level, and you're not using setPropertyRandom() so it woud have no effect.
+  run_control.setRandomSimulationSeed(34523) # This is possibly what you want, means all simulations will use the same random seed.
   # All runs have the same steps
   run_control.setSteps(STEPS)
   run_control.setPropertyUInt("STEPS", STEPS)
@@ -1294,13 +1303,19 @@ if ENSEMBLE:
               run_control.setPropertyFloat("STRAIN_STIFFENING_COEFF_DS", tSTRAIN_STIFFENING_COEFF_DS);
               run_control.setPropertyFloat("CRITICAL_STRAIN", tCRITICAL_STRAIN);
               runs_final += run_control
+              # Create directory names using the parameter values
+              dir_name = f"BUCKLING_COEFF_D0_{tBUCKLING_COEFF_D0.3f}_STRAIN_STIFFENING_COEFF_DS_{tSTRAIN_STIFFENING_COEFF_DS.3f}_CRITICAL_STRAIN_{tCRITICAL_STRAIN.3f}"
+              # Combine the base directory with the current directory name
+              full_path = RES_PATH / dir_name
+              # Create the directory if it doesn't exist
+              full_path.mkdir(parents=True, exist_ok=True)
 
   # Create a CUDAEnsemble to execute the RunPlanVector
   ensemble = pyflamegpu.CUDAEnsemble(model);
 
   # Override config defaults
-  ensemble.Config().out_directory = RES_PATH
-  ensemble.Config().out_format = "pickle"
+  ensemble.Config().out_directory = RES_PATH.as_posix()
+  ensemble.Config().out_format = "json"
   ensemble.Config().concurrent_runs = 1  # This is concurrent runs per device, higher values may improve performance for "small" models
   ensemble.Config().timing = False
   ensemble.Config().error_level = pyflamegpu.CUDAEnsembleConfig.Fast  # Kills the ensemble as soon as the first error is detected
@@ -1308,8 +1323,8 @@ if ENSEMBLE:
 
   # Pass any logging configs to the CUDAEnsemble
   # https://docs.flamegpu.com/guide/running-multiple-simulations/index.html#creating-a-logging-configuration
-  cuda_ensemble.setStepLog(step_log)
-  cuda_ensemble.setExitLog(logging_config)
+  ensemble.setStepLog(step_log)
+  ensemble.setExitLog(logging_config)
 
 else:
   simulation = pyflamegpu.CUDASimulation(model);
