@@ -76,7 +76,7 @@ start_time = time.time()
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
 ENSEMBLE = True;
 ENSEMBLE_RUNS = 0;
-VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
+VISUALISATION = False;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
@@ -99,7 +99,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 #+--------------------------------------------------------------------+
 TIME_STEP = 0.01; # seconds
-STEPS = 16000;
+STEPS = 1600;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -162,10 +162,15 @@ BOUNDARY_CONC_FIXED_MULTI = [[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0], # concentrati
                              [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]] # add as many lines as different species
                              
 INIT_ECM_CONCENTRATION_VALS = [0.0, 0.0]                          # initial concentration of each species on the ECM agents
-INCLUDE_VASCULARIZATION = False;                                   # if True, vascularization is taken into account     
+INCLUDE_VASCULARIZATION = False;                                   # if True, vascularization is taken into account
 INIT_VASCULARIZATION_CONCENTRATION_VALS = [-1.0, -1.0]              # initial concentration of each species on the VASCULARIZATION agents
 N_VASCULARIZATION_POINTS = 0;                                     # declared here. Points are loaded from file
 VASCULARIZATION_POINTS_COORDS = None;                             # declared here. Coords loaded from file
+
+# Cell agent related paramenters
+#+--------------------------------------------------------------------+
+INCLUDE_CELLS = False;
+N_CELLS = 100;
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -261,6 +266,12 @@ vascularization_move_file = "vascularization_move.cpp";
 """
 bcorner_output_location_data_file = "bcorner_output_location_data.cpp";
 bcorner_move_file = "bcorner_move.cpp";
+
+"""
+  CELL  
+"""
+cell_output_location_data_file = "cell_output_location_data.cpp";
+cell_move_file = "cell_move.cpp";
 
 """
   ECM
@@ -371,6 +382,20 @@ vascularization_location_message.newVariableFloat("vy");
 vascularization_location_message.newVariableFloat("vz");
 vascularization_location_message.newVariableArrayFloat("concentration_multi", N_SPECIES);
 
+cell_location_message = model.newMessageSpatial3D("cell_location_message");
+# Set the range and bounds.
+cell_location_message.setRadius(MAX_SEARCH_RADIUS); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
+cell_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
+cell_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
+cell_location_message.newVariableInt("id");
+cell_location_message.newVariableFloat("fmag");
+cell_location_message.newVariableFloat("vx");
+cell_location_message.newVariableFloat("vy");
+cell_location_message.newVariableFloat("vz");
+cell_location_message.newVariableFloat("orx");
+cell_location_message.newVariableFloat("ory");
+cell_location_message.newVariableFloat("orz");
+
 ecm_grid_location_message = model.newMessageArray3D("ecm_grid_location_message");
 ecm_grid_location_message.setDimensions(ECM_AGENTS_PER_DIR[0], ECM_AGENTS_PER_DIR[1], ECM_AGENTS_PER_DIR[2]);
 ecm_grid_location_message.newVariableInt("id");
@@ -422,8 +447,27 @@ bcorner_agent.newVariableFloat("z");
 
 bcorner_agent.newRTCFunctionFile("bcorner_output_location_data", bcorner_output_location_data_file).setMessageOutput("bcorner_location_message");
 bcorner_agent.newRTCFunctionFile("bcorner_move", bcorner_move_file);
-  
-  
+
+"""
+  Cell agent
+"""
+if INCLUDE_CELLS:
+    cell_agent = model.newAgent("CELL");
+    cell_agent.newVariableInt("id");
+    cell_agent.newVariableFloat("x");
+    cell_agent.newVariableFloat("y");
+    cell_agent.newVariableFloat("z");
+    cell_agent.newVariableFloat("vx");
+    cell_agent.newVariableFloat("vy");
+    cell_agent.newVariableFloat("vz");
+    cell_agent.newVariableFloat("fmag");
+    cell_agent.newVariableFloat("orx");
+    cell_agent.newVariableFloat("ory");
+    cell_agent.newVariableFloat("orz");
+    cell_agent.newRTCFunctionFile("cell_output_location_data", cell_output_location_data_file).setMessageOutput("cell_location_message");
+    cell_agent.newRTCFunctionFile("cell_move", cell_move_file).setMessageInput("ecm_grid_location_message");
+
+
 """
   ECM agent
 """
@@ -494,6 +538,23 @@ ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
   Helper functions 
 """
 
+def getRandomCoords3D(n, minx, maxx, miny, maxy, minz, maxz):
+    """
+    Generates an array (nx3 matrix) of random numbers with specific ranges for each column.
+
+    Args:
+        n (int): Number of rows in the array.
+        minx, maxx (float): Range for the values in the first column [minx, maxx].
+        miny, maxy (float): Range for the values in the second column [miny, maxy].
+        minz, maxz (float): Range for the values in the third column [minz, maxz].
+
+    Returns:
+        numpy.ndarray: Array of random numbers with shape (n, 3).
+    """
+    np.random.seed()
+    random_array = np.random.uniform(low=[minx, miny, minz], high=[maxx, maxy, maxz], size=(n, 3))
+    return random_array
+
 def randomVector3D():
     """
     Generates a random 3D unit vector (direction) with a uniform spherical distribution
@@ -558,7 +619,8 @@ def getFixedVectors3D(n_vectors: int, v_dir: np.array):
 # This class is used to ensure that corner agents are assigned the first 8 ids
 class initAgentPopulations(pyflamegpu.HostFunction):
   def run(self,FLAMEGPU):
-    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION, N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS, INCLUDE_FIBER_ALIGNMENT
+    global INIT_ECM_CONCENTRATION_VALS, N_SPECIES, INCLUDE_DIFFUSION, INCLUDE_VASCULARIZATION
+    global N_VASCULARIZATION_POINTS, VASCULARIZATION_POINTS_COORDS, INCLUDE_FIBER_ALIGNMENT, INCLUDE_CELLS, N_CELLS
     # BOUNDARY CORNERS
     current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
     coord_boundary = FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES")
@@ -712,10 +774,12 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                 instance.setVariableUInt8("grid_i", i);
                 instance.setVariableUInt8("grid_j", j);
                 instance.setVariableUInt8("grid_k", k);
-                
+
+    FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id + count)
     # VASCULARIZATION
     if INCLUDE_VASCULARIZATION:
-        current_id += count + 1;
+        current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
+        current_id += 1;
         count = -1;
         VASCULARIZATION_POINTS_COORDS = np.genfromtxt('vascularization_points.txt',delimiter =' ');
         #print(VASCULARIZATION_POINTS_COORDS)
@@ -735,8 +799,40 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             instance.setVariableFloat("vz", 0.0);
             instance.setVariableArrayFloat("concentration_multi", INIT_VASCULARIZATION_CONCENTRATION_VALS)
            
-    FLAMEGPU.environment.setPropertyUInt("N_VASCULARIZATION_POINTS", N_VASCULARIZATION_POINTS)
-    FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
+        FLAMEGPU.environment.setPropertyUInt("N_VASCULARIZATION_POINTS", N_VASCULARIZATION_POINTS)
+        FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id+count)
+
+    # CELLS
+    if INCLUDE_CELLS:
+        current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
+        current_id += 1;
+        count = -1;
+        cell_orientations = getRandomVectors3D(N_CELLS)
+        cell_pos = getRandomCoords3D(N_CELLS,
+                                     BOUNDARY_COORDS[0],BOUNDARY_COORDS[1],
+                                     BOUNDARY_COORDS[2],BOUNDARY_COORDS[3],
+                                     BOUNDARY_COORDS[4],BOUNDARY_COORDS[5])
+        for i in range(N_CELLS):
+            count += 1;
+            instance = FLAMEGPU.agent("CELL").newAgent();
+            instance.setVariableInt("id", current_id + count);
+            instance.setVariableFloat("x", cell_pos[i, 0]);
+            instance.setVariableFloat("y", cell_pos[i, 1]);
+            instance.setVariableFloat("z", cell_pos[i, 2]);
+            instance.setVariableFloat("fmag", 0.0);
+            instance.setVariableFloat("orx", cell_orientations[count, 0]);
+            instance.setVariableFloat("ory", cell_orientations[count, 1]);
+            instance.setVariableFloat("orz", cell_orientations[count, 2]);
+            instance.setVariableFloat("vx", 0.0);
+            instance.setVariableFloat("vy", 0.0);
+            instance.setVariableFloat("vz", 0.0);
+
+        FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id + count)
+
+
+
+
+
     return
     
 def resetMacroProperties(self,FLAMEGPU):
@@ -966,7 +1062,7 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                  
                 file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
                 if ENSEMBLE:
-                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN.3f}"
+                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D:0.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
                     # Combine the base directory with the current directory name
                     file_path = RES_PATH / dir_name / file_name
                 else:
@@ -1205,11 +1301,13 @@ model.newLayer("L1").addAgentFunction("ECM", "ecm_output_grid_location_data");
 model.Layer("L1").addAgentFunction("BCORNER", "bcorner_output_location_data");
 if INCLUDE_VASCULARIZATION:
     model.Layer("L1").addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
+if INCLUDE_CELLS:
+    model.Layer("L1").addAgentFunction("CELL", "cell_output_location_data");
 # Layer #2
 model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
 # Layer #3
 if INCLUDE_DIFFUSION:
-    odel.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
+    model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
 # Layer #4
 if INCLUDE_VASCULARIZATION:
     model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
@@ -1223,6 +1321,8 @@ model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
 model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
 if INCLUDE_VASCULARIZATION:
     model.newLayer("L8").addAgentFunction("VASCULARIZATION", "vascularization_move");
+if INCLUDE_CELLS:
+    model.newLayer("L9").addAgentFunction("CELL", "cell_move");
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
@@ -1304,7 +1404,7 @@ if ENSEMBLE:
               run_control.setPropertyFloat("CRITICAL_STRAIN", tCRITICAL_STRAIN);
               runs_final += run_control
               # Create directory names using the parameter values
-              dir_name = f"BUCKLING_COEFF_D0_{tBUCKLING_COEFF_D0.3f}_STRAIN_STIFFENING_COEFF_DS_{tSTRAIN_STIFFENING_COEFF_DS.3f}_CRITICAL_STRAIN_{tCRITICAL_STRAIN.3f}"
+              dir_name = f"BUCKLING_COEFF_D0_{tBUCKLING_COEFF_D0:.3f}_STRAIN_STIFFENING_COEFF_DS_{tSTRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{tCRITICAL_STRAIN:.3f}"
               # Combine the base directory with the current directory name
               full_path = RES_PATH / dir_name
               # Create the directory if it doesn't exist
@@ -1369,6 +1469,13 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
         square_vascularization_agt.setModel(pyflamegpu.CUBE);
         square_vascularization_agt.setModelScale(0.035);
         square_vascularization_agt.setColor(pyflamegpu.BLUE);
+
+    if INCLUDE_CELLS:
+        circ_cell_agt = visualisation.addAgent("CELL");
+        circ_cell_agt.setModel(pyflamegpu.ICOSPHERE);
+        circ_cell_agt.setModelScale(0.09);
+        circ_cell_agt.setColor(pyflamegpu.Color("#fc03e7"));
+
 
     pen = visualisation.newLineSketch(1, 1, 1, 0.8); 
     pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
