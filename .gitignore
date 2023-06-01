@@ -6,6 +6,7 @@ summary_plots.py
 moving_boundaries_grid3D_diffusion_old.py
 vascularization_points_line.txt
 vascularization_points_minitest.txt
+result_files/
 
 ##############################################
 # Default GitHub .gitignore for Python below #
