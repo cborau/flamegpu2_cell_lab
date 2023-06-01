@@ -1062,7 +1062,7 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                  
                 file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
                 if ENSEMBLE:
-                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D:0.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
+                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0:.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
                     # Combine the base directory with the current directory name
                     file_path = RES_PATH / dir_name / file_name
                 else:
