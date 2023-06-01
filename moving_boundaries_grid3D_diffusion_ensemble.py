@@ -876,409 +876,432 @@ class MoveBoundaries(pyflamegpu.HostFunction):
 
      # Define Python class 'constructor'
      def __init__(self):
-         super().__init__()
-         self.apply_parallel_disp = list()
-         for d in range(12):
-            if abs(BOUNDARY_DISP_RATES_PARALLEL[d]) > 0.0:
-                self.apply_parallel_disp.append(True)
-            else:
-                self.apply_parallel_disp.append(False)
+        try:
+            super().__init__()
+            self.apply_parallel_disp = list()
+            for d in range(12):
+                if abs(BOUNDARY_DISP_RATES_PARALLEL[d]) > 0.0:
+                    self.apply_parallel_disp.append(True)
+                else:
+                    self.apply_parallel_disp.append(False)
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
 
      # Override C++ method: virtual void run(FLAMEGPU_HOST_API*);
      def run(self, FLAMEGPU):
-         stepCounter = FLAMEGPU.getStepCounter() + 1;
-         global BOUNDARY_COORDS, BOUNDARY_DISP_RATES, ALLOW_BOUNDARY_ELASTIC_MOVEMENT, BOUNDARY_STIFFNESS, BOUNDARY_DUMPING, BPOS_OVER_TIME
-         global CLAMP_AGENT_TOUCHING_BOUNDARY, OSCILLATORY_SHEAR_ASSAY, OSCILLATORY_AMPLITUDE, OSCILLATORY_W, OSCILLATORY_STRAIN_OVER_TIME
-         global DEBUG_PRINTING, PAUSE_EVERY_STEP, TIME_STEP
+        try:
+            stepCounter = FLAMEGPU.getStepCounter() + 1;
+            global BOUNDARY_COORDS, BOUNDARY_DISP_RATES, ALLOW_BOUNDARY_ELASTIC_MOVEMENT, BOUNDARY_STIFFNESS, BOUNDARY_DUMPING, BPOS_OVER_TIME
+            global CLAMP_AGENT_TOUCHING_BOUNDARY, OSCILLATORY_SHEAR_ASSAY, OSCILLATORY_AMPLITUDE, OSCILLATORY_W, OSCILLATORY_STRAIN_OVER_TIME
+            global DEBUG_PRINTING, PAUSE_EVERY_STEP, TIME_STEP
          
-         boundaries_moved = False
-         if PAUSE_EVERY_STEP:
-             input() # pause everystep
+            boundaries_moved = False
+            if PAUSE_EVERY_STEP:
+                input() # pause everystep
 
-         if OSCILLATORY_SHEAR_ASSAY:   
-             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
-                #OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
-                OSCILLATORY_STRAIN_OVER_TIME = pd.concat([OSCILLATORY_STRAIN_OVER_TIME,new_val], ignore_index=True); 
-             for d in range(12):
-                if self.apply_parallel_disp[d]:
-                    BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * stepCounter) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*t is used because the slope of the sin(w*t) function is needed
+            if OSCILLATORY_SHEAR_ASSAY:   
+                if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                    new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
+                    #OSCILLATORY_STRAIN_OVER_TIME = OSCILLATORY_STRAIN_OVER_TIME.append(new_val, ignore_index=True) #TODO: FIX?
+                    OSCILLATORY_STRAIN_OVER_TIME = pd.concat([OSCILLATORY_STRAIN_OVER_TIME,new_val], ignore_index=True); 
+                for d in range(12):
+                    if self.apply_parallel_disp[d]:
+                        BOUNDARY_DISP_RATES_PARALLEL[d] = OSCILLATORY_AMPLITUDE * math.cos(OSCILLATORY_W * stepCounter) * OSCILLATORY_W / TIME_STEP; # cos(w*t)*t is used because the slope of the sin(w*t) function is needed
 
-             FLAMEGPU.environment.setPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", BOUNDARY_DISP_RATES_PARALLEL); 
+                FLAMEGPU.environment.setPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", BOUNDARY_DISP_RATES_PARALLEL); 
 
 
-         if any(catb < 1 for catb in CLAMP_AGENT_TOUCHING_BOUNDARY) or any(abem > 0 for abem in ALLOW_BOUNDARY_ELASTIC_MOVEMENT):
-             boundaries_moved = True
-             agent = FLAMEGPU.agent("ECM")
-             minmax_positions = list()
-             minmax_positions.append(agent.maxFloat("x"))
-             minmax_positions.append(agent.minFloat("x"))
-             minmax_positions.append(agent.maxFloat("y"))
-             minmax_positions.append(agent.minFloat("y"))
-             minmax_positions.append(agent.maxFloat("z"))
-             minmax_positions.append(agent.minFloat("z"))
-             boundary_equil_distances = list()             
-             boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
-             for i in range(6): 
-                if CLAMP_AGENT_TOUCHING_BOUNDARY[i] < 1: 
-                    if ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i] > 0:
-                        BOUNDARY_COORDS[i] = minmax_positions[i] + boundary_equil_distances[i]
-                    else:
-                        BOUNDARY_COORDS[i] = minmax_positions[i]
+            if any(catb < 1 for catb in CLAMP_AGENT_TOUCHING_BOUNDARY) or any(abem > 0 for abem in ALLOW_BOUNDARY_ELASTIC_MOVEMENT):
+                boundaries_moved = True
+                agent = FLAMEGPU.agent("ECM")
+                minmax_positions = list()
+                minmax_positions.append(agent.maxFloat("x"))
+                minmax_positions.append(agent.minFloat("x"))
+                minmax_positions.append(agent.maxFloat("y"))
+                minmax_positions.append(agent.minFloat("y"))
+                minmax_positions.append(agent.maxFloat("z"))
+                minmax_positions.append(agent.minFloat("z"))
+                boundary_equil_distances = list()             
+                boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                boundary_equil_distances.append(ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                boundary_equil_distances.append(-ECM_BOUNDARY_EQUILIBRIUM_DISTANCE)
+                for i in range(6): 
+                    if CLAMP_AGENT_TOUCHING_BOUNDARY[i] < 1: 
+                        if ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i] > 0:
+                            BOUNDARY_COORDS[i] = minmax_positions[i] + boundary_equil_distances[i]
+                        else:
+                            BOUNDARY_COORDS[i] = minmax_positions[i]
 
-             bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
-             FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)        
+                bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
+                FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)        
                     
-             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                print ("====== MOVING FREE BOUNDARIES  ======")                 
-                print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
-                print ("=====================================")
+                if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                    print ("====== MOVING FREE BOUNDARIES  ======")                 
+                    print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+                    print ("=====================================")
          
-         if any(dr > 0.0 or dr < 0.0 for dr in BOUNDARY_DISP_RATES):    
-            boundaries_moved = True 
-            for i in range(6):                
-                BOUNDARY_COORDS[i] += (BOUNDARY_DISP_RATES[i] * TIME_STEP)
+            if any(dr > 0.0 or dr < 0.0 for dr in BOUNDARY_DISP_RATES):    
+                boundaries_moved = True 
+                for i in range(6):                
+                    BOUNDARY_COORDS[i] += (BOUNDARY_DISP_RATES[i] * TIME_STEP)
             
-            bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
-            FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
-            if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                print ("====== MOVING BOUNDARIES DUE TO CONDITIONS ======")                 
-                print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
-                print ("=================================================")
+                bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
+                FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
+                if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                    print ("====== MOVING BOUNDARIES DUE TO CONDITIONS ======")                 
+                    print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+                    print ("=================================================")
 
-         #if any(abem > 0 for abem in ALLOW_BOUNDARY_ELASTIC_MOVEMENT):
-         #   boundaries_moved = True
-         #   print ("====== MOVING BOUNDARIES DUE TO FORCES ======") 
-         #   agent = FLAMEGPU.agent("ECM")        
-         #   sum_bx_pos = agent.sumFloat("f_bx_pos")
-         #   sum_bx_neg = agent.sumFloat("f_bx_neg")
-         #   sum_by_pos = agent.sumFloat("f_by_pos")
-         #   sum_by_neg = agent.sumFloat("f_by_neg")
-         #   sum_bz_pos = agent.sumFloat("f_bz_pos")
-         #   sum_bz_neg = agent.sumFloat("f_bz_neg")
-         #   print ("Total forces [+X,-X,+Y,-Y,+Z,-Z]: ", sum_bx_pos, sum_bx_neg, sum_by_pos, sum_by_neg, sum_bz_pos, sum_bz_neg)
-         #   boundary_forces = [sum_bx_pos, sum_bx_neg, sum_by_pos, sum_by_neg, sum_bz_pos, sum_bz_neg];            
-         #   for i in range(6):  
-         #       if BOUNDARY_DISP_RATES[i] < EPSILON and BOUNDARY_DISP_RATES[i] > -EPSILON and ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i]:
-         #           #u = boundary_forces[i] / BOUNDARY_STIFFNESS[i]
-         #           u = (boundary_forces[i] * TIME_STEP)/ (BOUNDARY_STIFFNESS[i] * TIME_STEP + BOUNDARY_DUMPING[i])
-         #           print ("Displacement for boundary {} = {}".format(i,u));
-         #           BOUNDARY_COORDS[i] += u
-            
-         #   bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
-         #   FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
-         #   print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
-         #   print ("=================================================")
+            #if any(abem > 0 for abem in ALLOW_BOUNDARY_ELASTIC_MOVEMENT):
+            #   boundaries_moved = True
+            #   print ("====== MOVING BOUNDARIES DUE TO FORCES ======") 
+            #   agent = FLAMEGPU.agent("ECM")        
+            #   sum_bx_pos = agent.sumFloat("f_bx_pos")
+            #   sum_bx_neg = agent.sumFloat("f_bx_neg")
+            #   sum_by_pos = agent.sumFloat("f_by_pos")
+            #   sum_by_neg = agent.sumFloat("f_by_neg")
+            #   sum_bz_pos = agent.sumFloat("f_bz_pos")
+            #   sum_bz_neg = agent.sumFloat("f_bz_neg")
+            #   print ("Total forces [+X,-X,+Y,-Y,+Z,-Z]: ", sum_bx_pos, sum_bx_neg, sum_by_pos, sum_by_neg, sum_bz_pos, sum_bz_neg)
+            #   boundary_forces = [sum_bx_pos, sum_bx_neg, sum_by_pos, sum_by_neg, sum_bz_pos, sum_bz_neg];            
+            #   for i in range(6):  
+            #       if BOUNDARY_DISP_RATES[i] < EPSILON and BOUNDARY_DISP_RATES[i] > -EPSILON and ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i]:
+            #           #u = boundary_forces[i] / BOUNDARY_STIFFNESS[i]
+            #           u = (boundary_forces[i] * TIME_STEP)/ (BOUNDARY_STIFFNESS[i] * TIME_STEP + BOUNDARY_DUMPING[i])
+            #           print ("Displacement for boundary {} = {}".format(i,u));
+            #           BOUNDARY_COORDS[i] += u
+
+            #   bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
+            #   FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
+            #   print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+            #   print ("=================================================")
          
-         if boundaries_moved:
-            if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
-                #BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
-                BPOS_OVER_TIME = pd.concat([BPOS_OVER_TIME,new_pos], ignore_index=True);
+            if boundaries_moved:
+                if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                    new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
+                    #BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
+                    BPOS_OVER_TIME = pd.concat([BPOS_OVER_TIME,new_pos], ignore_index=True);
 
 
-         #print ("End of step: ", stepCounter)
+            #print ("End of step: ", stepCounter)
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
 
 
 class SaveDataToFile(pyflamegpu.HostFunction):
     def __init__(self):
-        global N, N_VASCULARIZATION_POINTS
-        super().__init__()
-        self.header = list()
-        self.header.append("# vtk DataFile Version 3.0")
-        self.header.append("ECM data")
-        self.header.append("ASCII")
-        self.header.append("DATASET POLYDATA")
-        self.header.append("POINTS {} float".format(8 + N*N*N)) #number of ECM agents + 8 corners 
-        #self.header.append("POINTS {} float".format(8))         
-        self.domaindata = list()
-        self.domaindata.append("POLYGONS 6 30")
-        cube_conn = [[4, 0, 3, 7, 4],[4, 1, 2, 6, 5],[4, 1, 0, 4, 5],[4, 2, 3, 7, 6],[4, 0, 1, 2, 3],[4, 4, 5, 6, 7]]
-        for i in range(len(cube_conn)):
-            for j in range(len(cube_conn[i])):
-                if j > 0:
-                    cube_conn[i][j] = cube_conn[i][j] + N*N*N
-            self.domaindata.append(' '.join(str(x) for x in cube_conn[i]))
-            
-        #self.domaindata.append("4 0 3 7 4")
-        #self.domaindata.append("4 1 2 6 5")
-        #self.domaindata.append("4 1 0 4 5")
-        #self.domaindata.append("4 2 3 7 6")
-        #self.domaindata.append("4 0 1 2 3")
-        #self.domaindata.append("4 4 5 6 7")
-        self.domaindata.append("CELL_DATA 6")
-        self.domaindata.append("SCALARS boundary_index int 1")
-        self.domaindata.append("LOOKUP_TABLE default")
-        self.domaindata.append("0")
-        self.domaindata.append("1")
-        self.domaindata.append("2")
-        self.domaindata.append("3")
-        self.domaindata.append("4")
-        self.domaindata.append("5")
-        self.domaindata.append("NORMALS boundary_normals float")
-        self.domaindata.append("1 0 0")
-        self.domaindata.append("-1 0 0")
-        self.domaindata.append("0 1 0")
-        self.domaindata.append("0 -1 0")
-        self.domaindata.append("0 0 1")
-        self.domaindata.append("0 0 -1")
-        self.vascularizationdata = list() # a different file is created to show the position of the vascularization points
-        self.vascularizationdata.append("# vtk DataFile Version 3.0")
-        self.vascularizationdata.append("Vascularization points")
-        self.vascularizationdata.append("ASCII") 
-        self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")        
-        
+        try:
+            global N, N_VASCULARIZATION_POINTS
+            super().__init__()
+            self.header = list()
+            self.header.append("# vtk DataFile Version 3.0")
+            self.header.append("ECM data")
+            self.header.append("ASCII")
+            self.header.append("DATASET POLYDATA")
+            self.header.append("POINTS {} float".format(8 + N*N*N)) #number of ECM agents + 8 corners 
+            #self.header.append("POINTS {} float".format(8))         
+            self.domaindata = list()
+            self.domaindata.append("POLYGONS 6 30")
+            cube_conn = [[4, 0, 3, 7, 4],[4, 1, 2, 6, 5],[4, 1, 0, 4, 5],[4, 2, 3, 7, 6],[4, 0, 1, 2, 3],[4, 4, 5, 6, 7]]
+            for i in range(len(cube_conn)):
+                for j in range(len(cube_conn[i])):
+                    if j > 0:
+                        cube_conn[i][j] = cube_conn[i][j] + N*N*N
+                self.domaindata.append(' '.join(str(x) for x in cube_conn[i]))
+                
+            #self.domaindata.append("4 0 3 7 4")
+            #self.domaindata.append("4 1 2 6 5")
+            #self.domaindata.append("4 1 0 4 5")
+            #self.domaindata.append("4 2 3 7 6")
+            #self.domaindata.append("4 0 1 2 3")
+            #self.domaindata.append("4 4 5 6 7")
+            self.domaindata.append("CELL_DATA 6")
+            self.domaindata.append("SCALARS boundary_index int 1")
+            self.domaindata.append("LOOKUP_TABLE default")
+            self.domaindata.append("0")
+            self.domaindata.append("1")
+            self.domaindata.append("2")
+            self.domaindata.append("3")
+            self.domaindata.append("4")
+            self.domaindata.append("5")
+            self.domaindata.append("NORMALS boundary_normals float")
+            self.domaindata.append("1 0 0")
+            self.domaindata.append("-1 0 0")
+            self.domaindata.append("0 1 0")
+            self.domaindata.append("0 -1 0")
+            self.domaindata.append("0 0 1")
+            self.domaindata.append("0 0 -1")
+            self.vascularizationdata = list() # a different file is created to show the position of the vascularization points
+            self.vascularizationdata.append("# vtk DataFile Version 3.0")
+            self.vascularizationdata.append("Vascularization points")
+            self.vascularizationdata.append("ASCII") 
+            self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")       
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
  
     def run(self, FLAMEGPU):
-        global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
-        global RES_PATH, ENSEMBLE
-        global fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
-        BUCKLING_COEFF_D0 = FLAMEGPU.environment.getPropertyFloat("BUCKLING_COEFF_D0")
-        STRAIN_STIFFENING_COEFF_DS = FLAMEGPU.environment.getPropertyFloat("STRAIN_STIFFENING_COEFF_DS")
-        CRITICAL_STRAIN = FLAMEGPU.environment.getPropertyFloat("CRITICAL_STRAIN")
-        stepCounter = FLAMEGPU.getStepCounter() + 1;
-        
-        if SAVE_DATA_TO_FILE:
-            if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                
-                if INCLUDE_VASCULARIZATION:
-                    vasc_coords = list()
-                    file_name = 'vascularization_points_t{:04d}.vtk'.format(stepCounter)
-                    file_path = RES_PATH / file_name
-                    vasc_agent = FLAMEGPU.agent("VASCULARIZATION");
-                    av = vasc_agent.getPopulationData(); # this returns a DeviceAgentVector 
+        try:
+            global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
+            global RES_PATH, ENSEMBLE
+            global fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
+            BUCKLING_COEFF_D0 = FLAMEGPU.environment.getPropertyFloat("BUCKLING_COEFF_D0")
+            STRAIN_STIFFENING_COEFF_DS = FLAMEGPU.environment.getPropertyFloat("STRAIN_STIFFENING_COEFF_DS")
+            CRITICAL_STRAIN = FLAMEGPU.environment.getPropertyFloat("CRITICAL_STRAIN")
+            stepCounter = FLAMEGPU.getStepCounter() + 1;
+            
+            if SAVE_DATA_TO_FILE:
+                if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
+                    
+                    if INCLUDE_VASCULARIZATION:
+                        vasc_coords = list()
+                        file_name = 'vascularization_points_t{:04d}.vtk'.format(stepCounter)
+                        file_path = RES_PATH / file_name
+                        vasc_agent = FLAMEGPU.agent("VASCULARIZATION");
+                        av = vasc_agent.getPopulationData(); # this returns a DeviceAgentVector 
+                        for ai in av:
+                           coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
+                           vasc_coords.append(coords_ai)
+                        with open(str(file_path), 'w') as file:
+                            for line in self.vascularizationdata:
+                                file.write(line  + '\n') 
+                            file.write("POINTS {} float \n".format(FLAMEGPU.environment.getPropertyUInt("N_VASCULARIZATION_POINTS"))) #number of vascularization agents                            
+                            for coords_ai in vasc_coords:
+                                file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
+                     
+                    file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
+                    if ENSEMBLE:
+                        dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0:.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
+                        # Combine the base directory with the current directory name
+                        file_path = RES_PATH / dir_name / file_name
+                    else:
+                        file_path = RES_PATH / file_name
+
+                    agent = FLAMEGPU.agent("ECM");
+                    # reaction forces, thus, opposite to agent-applied forces
+                    sum_bx_pos = -agent.sumFloat("f_bx_pos") 
+                    sum_bx_neg = -agent.sumFloat("f_bx_neg")
+                    sum_by_pos = -agent.sumFloat("f_by_pos")
+                    sum_by_neg = -agent.sumFloat("f_by_neg")
+                    sum_bz_pos = -agent.sumFloat("f_bz_pos")
+                    sum_bz_neg = -agent.sumFloat("f_bz_neg")
+                    sum_bx_pos_y = -agent.sumFloat("f_bx_pos_y")
+                    sum_bx_pos_z = -agent.sumFloat("f_bx_pos_z")
+                    sum_bx_neg_y = -agent.sumFloat("f_bx_neg_y")
+                    sum_bx_neg_z = -agent.sumFloat("f_bx_neg_z")
+                    sum_by_pos_x = -agent.sumFloat("f_by_pos_x")
+                    sum_by_pos_z = -agent.sumFloat("f_by_pos_z")
+                    sum_by_neg_x = -agent.sumFloat("f_by_neg_x")
+                    sum_by_neg_z = -agent.sumFloat("f_by_neg_z")
+                    sum_bz_pos_x = -agent.sumFloat("f_bz_pos_x")
+                    sum_bz_pos_y = -agent.sumFloat("f_bz_pos_y")
+                    sum_bz_neg_x = -agent.sumFloat("f_bz_neg_x")
+                    sum_bz_neg_y = -agent.sumFloat("f_bz_neg_y")
+
+                    coords = list()                
+                    velocity = list()
+                    orientation = list()
+                    alignment = list()
+                    gel_conc = list()
+                    force = list()
+                    elastic_energy = list()
+                    concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
+                    av = agent.getPopulationData(); # this returns a DeviceAgentVector 
                     for ai in av:
                        coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
-                       vasc_coords.append(coords_ai)
+                       velocity_ai = (ai.getVariableFloat("vx"),ai.getVariableFloat("vy"),ai.getVariableFloat("vz"))
+                       force_ai = (ai.getVariableFloat("fx"),ai.getVariableFloat("fy"),ai.getVariableFloat("fz"))
+                       orientation_ai = (ai.getVariableFloat("orx"),ai.getVariableFloat("ory"),ai.getVariableFloat("orz"))
+                       alignment.append(ai.getVariableFloat("alignment"))
+                       gel_conc.append(ai.getVariableFloat("gel_conc"))
+                       coords.append(coords_ai)
+                       velocity.append(velocity_ai)
+                       force.append(force_ai)
+                       orientation.append(orientation_ai)
+                       elastic_energy.append(ai.getVariableFloat("elastic_energy"))
+                       concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
+                    print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
                     with open(str(file_path), 'w') as file:
-                        for line in self.vascularizationdata:
-                            file.write(line  + '\n') 
-                        file.write("POINTS {} float \n".format(FLAMEGPU.environment.getPropertyUInt("N_VASCULARIZATION_POINTS"))) #number of vascularization agents                            
-                        for coords_ai in vasc_coords:
+                        for line in self.header:
+                            file.write(line  + '\n')                    
+                        for coords_ai in coords:
                             file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
-                 
-                file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
-                if ENSEMBLE:
-                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0:.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
-                    # Combine the base directory with the current directory name
-                    file_path = RES_PATH / dir_name / file_name
-                else:
-                    file_path = RES_PATH / file_name
-
-                agent = FLAMEGPU.agent("ECM");
-                # reaction forces, thus, opposite to agent-applied forces
-                sum_bx_pos = -agent.sumFloat("f_bx_pos") 
-                sum_bx_neg = -agent.sumFloat("f_bx_neg")
-                sum_by_pos = -agent.sumFloat("f_by_pos")
-                sum_by_neg = -agent.sumFloat("f_by_neg")
-                sum_bz_pos = -agent.sumFloat("f_bz_pos")
-                sum_bz_neg = -agent.sumFloat("f_bz_neg")
-                sum_bx_pos_y = -agent.sumFloat("f_bx_pos_y")
-                sum_bx_pos_z = -agent.sumFloat("f_bx_pos_z")
-                sum_bx_neg_y = -agent.sumFloat("f_bx_neg_y")
-                sum_bx_neg_z = -agent.sumFloat("f_bx_neg_z")
-                sum_by_pos_x = -agent.sumFloat("f_by_pos_x")
-                sum_by_pos_z = -agent.sumFloat("f_by_pos_z")
-                sum_by_neg_x = -agent.sumFloat("f_by_neg_x")
-                sum_by_neg_z = -agent.sumFloat("f_by_neg_z")
-                sum_bz_pos_x = -agent.sumFloat("f_bz_pos_x")
-                sum_bz_pos_y = -agent.sumFloat("f_bz_pos_y")
-                sum_bz_neg_x = -agent.sumFloat("f_bz_neg_x")
-                sum_bz_neg_y = -agent.sumFloat("f_bz_neg_y")
-
-                coords = list()                
-                velocity = list()
-                orientation = list()
-                alignment = list()
-                gel_conc = list()
-                force = list()
-                elastic_energy = list()
-                concentration_multi = list()    # this is a list of tuples. Each tuple has N_SPECIES elements 
-                av = agent.getPopulationData(); # this returns a DeviceAgentVector 
-                for ai in av:
-                   coords_ai = (ai.getVariableFloat("x"),ai.getVariableFloat("y"),ai.getVariableFloat("z"))
-                   velocity_ai = (ai.getVariableFloat("vx"),ai.getVariableFloat("vy"),ai.getVariableFloat("vz"))
-                   force_ai = (ai.getVariableFloat("fx"),ai.getVariableFloat("fy"),ai.getVariableFloat("fz"))
-                   orientation_ai = (ai.getVariableFloat("orx"),ai.getVariableFloat("ory"),ai.getVariableFloat("orz"))
-                   alignment.append(ai.getVariableFloat("alignment"))
-                   gel_conc.append(ai.getVariableFloat("gel_conc"))
-                   coords.append(coords_ai)
-                   velocity.append(velocity_ai)
-                   force.append(force_ai)
-                   orientation.append(orientation_ai)
-                   elastic_energy.append(ai.getVariableFloat("elastic_energy"))
-                   concentration_multi.append(ai.getVariableArrayFloat("concentration_multi"))
-                print ("====== SAVING DATA FROM Step {:03d} TO FILE ======".format(stepCounter))
-                with open(str(file_path), 'w') as file:
-                    for line in self.header:
-                        file.write(line  + '\n')                    
-                    for coords_ai in coords:
-                        file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
-                    # Write boundary positions at the end so that corner points don't cover the points underneath
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[3],BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[2],BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
-                    for line in self.domaindata: 
-                        file.write(line  + '\n')
-                    file.write("SCALARS boundary_normal_forces float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    file.write(str(sum_bx_pos) + '\n')
-                    file.write(str(sum_bx_neg) + '\n')
-                    file.write(str(sum_by_pos) + '\n')
-                    file.write(str(sum_by_neg) + '\n')
-                    file.write(str(sum_bz_pos) + '\n')
-                    file.write(str(sum_bz_neg) + '\n')
-                    file.write("SCALARS boundary_normal_force_scaling float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    file.write(str(abs(sum_bx_pos)) + '\n')
-                    file.write(str(abs(sum_bx_neg)) + '\n')
-                    file.write(str(abs(sum_by_pos)) + '\n')
-                    file.write(str(abs(sum_by_neg)) + '\n')
-                    file.write(str(abs(sum_bz_pos)) + '\n')
-                    file.write(str(abs(sum_bz_neg)) + '\n')
-                    file.write("VECTORS boundary_normal_force_dir float" + '\n')
-                    file.write("1 0 0 \n" if sum_bx_pos > 0 else "-1 0 0 \n")
-                    file.write("1 0 0 \n" if sum_bx_neg > 0 else "-1 0 0 \n")
-                    file.write("0 1 0 \n" if sum_by_pos > 0 else "0 -1 0 \n")
-                    file.write("0 1 0 \n" if sum_by_neg > 0 else "0 -1 0 \n")
-                    file.write("0 0 1 \n" if sum_bz_pos > 0 else "0 0 -1 \n")
-                    file.write("0 0 1 \n" if sum_bz_neg > 0 else "0 0 -1 \n")
-                    # must be divided in blocks of 6 (one value per face of the cube)
-                    file.write("SCALARS boundary_shear_forces_pos float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    file.write(str(sum_bx_pos_y) + '\n')
-                    file.write(str(sum_bx_pos_z) + '\n')                    
-                    file.write(str(sum_by_pos_x) + '\n')
-                    file.write(str(sum_by_pos_z) + '\n')                    
-                    file.write(str(sum_bz_pos_x) + '\n')
-                    file.write(str(sum_bz_pos_y) + '\n')
-                    file.write("SCALARS boundary_shear_forces_neg float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')                    
-                    file.write(str(sum_bx_neg_y) + '\n')
-                    file.write(str(sum_bx_neg_z) + '\n')
-                    file.write(str(sum_by_neg_x) + '\n')
-                    file.write(str(sum_by_neg_z) + '\n')
-                    file.write(str(sum_bz_neg_x) + '\n')
-                    file.write(str(sum_bz_neg_y) + '\n')
-                    file.write("SCALARS boundary_shear_force_scaling_pos float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    file.write(str(abs(sum_bx_pos_y)) + '\n')
-                    file.write(str(abs(sum_bx_pos_z)) + '\n')                    
-                    file.write(str(abs(sum_by_pos_x)) + '\n')
-                    file.write(str(abs(sum_by_pos_z)) + '\n')                    
-                    file.write(str(abs(sum_bz_pos_x)) + '\n')
-                    file.write(str(abs(sum_bz_pos_y)) + '\n')
-                    file.write("SCALARS boundary_shear_force_scaling_neg float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')                    
-                    file.write(str(abs(sum_bx_neg_y))+ '\n')
-                    file.write(str(abs(sum_bx_neg_z)) + '\n')
-                    file.write(str(abs(sum_by_neg_x)) + '\n')
-                    file.write(str(abs(sum_by_neg_z)) + '\n')
-                    file.write(str(abs(sum_bz_neg_x)) + '\n')
-                    file.write(str(abs(sum_bz_neg_y)) + '\n')
-                    
-                    file.write("VECTORS boundary_shear_force_dir_pos float" + '\n')
-                    file.write("0 1 0 \n" if sum_bx_pos_y > 0 else "0 -1 0 \n")
-                    file.write("0 0 1 \n" if sum_bx_pos_z > 0 else "0 0 -1 \n")                    
-                    file.write("1 0 0 \n" if sum_by_pos_x > 0 else "-1 0 0 \n")
-                    file.write("0 0 1 \n" if sum_by_pos_z > 0 else "0 0 -1 \n")                    
-                    file.write("1 0 0 \n" if sum_bz_pos_x > 0 else "-1 0 0 \n")
-                    file.write("0 1 0 \n" if sum_bz_pos_y > 0 else "0 -1 0 \n")
-                    file.write("VECTORS boundary_shear_force_dir_neg float" + '\n')                    
-                    file.write("0 1 0 \n" if sum_bx_neg_y > 0 else "0 -1 0 \n")
-                    file.write("0 0 1 \n" if sum_bx_neg_z > 0 else "0 0 -1 \n")
-                    file.write("1 0 0 \n" if sum_by_neg_x > 0 else "-1 0 0 \n")
-                    file.write("0 0 1 \n" if sum_by_neg_z > 0 else "0 0 -1 \n")
-                    file.write("1 0 0 \n" if sum_bz_neg_x > 0 else "-1 0 0 \n")
-                    file.write("0 1 0 \n" if sum_bz_neg_y > 0 else "0 -1 0 \n")                    
-                    
-                    file.write("POINT_DATA {} \n".format(8 + N*N*N)) #8 corners + number of ECM agents 
-                    
-                    file.write("SCALARS is_corner int 1" + '\n')   # create this variable to remove them from representations
-                    file.write("LOOKUP_TABLE default" + '\n')
-                    
-                    for ee_ai in elastic_energy:
-                        file.write("{0} \n".format(0))
-                    for i in range(8):
-                        file.write("1 \n") # boundary corners
-                    
-                    file.write("SCALARS elastic_energy float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')                    
-                    for ee_ai in elastic_energy:
-                        file.write("{:.4f} \n".format(ee_ai))
-                    for i in range(8):
-                        file.write("0.0 \n") # boundary corners
+                        # Write boundary positions at the end so that corner points don't cover the points underneath
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[4]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[4]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[3],BOUNDARY_COORDS[4]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[2],BOUNDARY_COORDS[5]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[2],BOUNDARY_COORDS[5]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[1],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
+                        file.write("{} {} {} \n".format(BOUNDARY_COORDS[0],BOUNDARY_COORDS[3],BOUNDARY_COORDS[5]))
+                        for line in self.domaindata: 
+                            file.write(line  + '\n')
+                        file.write("SCALARS boundary_normal_forces float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        file.write(str(sum_bx_pos) + '\n')
+                        file.write(str(sum_bx_neg) + '\n')
+                        file.write(str(sum_by_pos) + '\n')
+                        file.write(str(sum_by_neg) + '\n')
+                        file.write(str(sum_bz_pos) + '\n')
+                        file.write(str(sum_bz_neg) + '\n')
+                        file.write("SCALARS boundary_normal_force_scaling float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        file.write(str(abs(sum_bx_pos)) + '\n')
+                        file.write(str(abs(sum_bx_neg)) + '\n')
+                        file.write(str(abs(sum_by_pos)) + '\n')
+                        file.write(str(abs(sum_by_neg)) + '\n')
+                        file.write(str(abs(sum_bz_pos)) + '\n')
+                        file.write(str(abs(sum_bz_neg)) + '\n')
+                        file.write("VECTORS boundary_normal_force_dir float" + '\n')
+                        file.write("1 0 0 \n" if sum_bx_pos > 0 else "-1 0 0 \n")
+                        file.write("1 0 0 \n" if sum_bx_neg > 0 else "-1 0 0 \n")
+                        file.write("0 1 0 \n" if sum_by_pos > 0 else "0 -1 0 \n")
+                        file.write("0 1 0 \n" if sum_by_neg > 0 else "0 -1 0 \n")
+                        file.write("0 0 1 \n" if sum_bz_pos > 0 else "0 0 -1 \n")
+                        file.write("0 0 1 \n" if sum_bz_neg > 0 else "0 0 -1 \n")
+                        # must be divided in blocks of 6 (one value per face of the cube)
+                        file.write("SCALARS boundary_shear_forces_pos float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        file.write(str(sum_bx_pos_y) + '\n')
+                        file.write(str(sum_bx_pos_z) + '\n')                    
+                        file.write(str(sum_by_pos_x) + '\n')
+                        file.write(str(sum_by_pos_z) + '\n')                    
+                        file.write(str(sum_bz_pos_x) + '\n')
+                        file.write(str(sum_bz_pos_y) + '\n')
+                        file.write("SCALARS boundary_shear_forces_neg float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')                    
+                        file.write(str(sum_bx_neg_y) + '\n')
+                        file.write(str(sum_bx_neg_z) + '\n')
+                        file.write(str(sum_by_neg_x) + '\n')
+                        file.write(str(sum_by_neg_z) + '\n')
+                        file.write(str(sum_bz_neg_x) + '\n')
+                        file.write(str(sum_bz_neg_y) + '\n')
+                        file.write("SCALARS boundary_shear_force_scaling_pos float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        file.write(str(abs(sum_bx_pos_y)) + '\n')
+                        file.write(str(abs(sum_bx_pos_z)) + '\n')                    
+                        file.write(str(abs(sum_by_pos_x)) + '\n')
+                        file.write(str(abs(sum_by_pos_z)) + '\n')                    
+                        file.write(str(abs(sum_bz_pos_x)) + '\n')
+                        file.write(str(abs(sum_bz_pos_y)) + '\n')
+                        file.write("SCALARS boundary_shear_force_scaling_neg float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')                    
+                        file.write(str(abs(sum_bx_neg_y))+ '\n')
+                        file.write(str(abs(sum_bx_neg_z)) + '\n')
+                        file.write(str(abs(sum_by_neg_x)) + '\n')
+                        file.write(str(abs(sum_by_neg_z)) + '\n')
+                        file.write(str(abs(sum_bz_neg_x)) + '\n')
+                        file.write(str(abs(sum_bz_neg_y)) + '\n')
                         
-                    file.write("SCALARS alignment float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')                    
-                    for a_ai in alignment:
-                        file.write("{:.4f} \n".format(a_ai))
-                    for i in range(8):
-                        file.write("0.0 \n") # boundary corners
+                        file.write("VECTORS boundary_shear_force_dir_pos float" + '\n')
+                        file.write("0 1 0 \n" if sum_bx_pos_y > 0 else "0 -1 0 \n")
+                        file.write("0 0 1 \n" if sum_bx_pos_z > 0 else "0 0 -1 \n")                    
+                        file.write("1 0 0 \n" if sum_by_pos_x > 0 else "-1 0 0 \n")
+                        file.write("0 0 1 \n" if sum_by_pos_z > 0 else "0 0 -1 \n")                    
+                        file.write("1 0 0 \n" if sum_bz_pos_x > 0 else "-1 0 0 \n")
+                        file.write("0 1 0 \n" if sum_bz_pos_y > 0 else "0 -1 0 \n")
+                        file.write("VECTORS boundary_shear_force_dir_neg float" + '\n')                    
+                        file.write("0 1 0 \n" if sum_bx_neg_y > 0 else "0 -1 0 \n")
+                        file.write("0 0 1 \n" if sum_bx_neg_z > 0 else "0 0 -1 \n")
+                        file.write("1 0 0 \n" if sum_by_neg_x > 0 else "-1 0 0 \n")
+                        file.write("0 0 1 \n" if sum_by_neg_z > 0 else "0 0 -1 \n")
+                        file.write("1 0 0 \n" if sum_bz_neg_x > 0 else "-1 0 0 \n")
+                        file.write("0 1 0 \n" if sum_bz_neg_y > 0 else "0 -1 0 \n")                    
                         
-                    file.write("SCALARS gel_conc float 1" + '\n')
-                    file.write("LOOKUP_TABLE default" + '\n')                    
-                    for gc_ai in gel_conc:
-                        file.write("{:.4f} \n".format(gc_ai))
-                    for i in range(8):
-                        file.write("0.0 \n") # boundary corners
-                                            
-                    for s in range(N_SPECIES):                    
-                        file.write("SCALARS concentration_species_{0} float 1 \n".format(s))
+                        file.write("POINT_DATA {} \n".format(8 + N*N*N)) #8 corners + number of ECM agents 
+                        
+                        file.write("SCALARS is_corner int 1" + '\n')   # create this variable to remove them from representations
                         file.write("LOOKUP_TABLE default" + '\n')
                         
-                        for c_ai in concentration_multi:
-                            file.write("{:.4f} \n".format(c_ai[s]))
+                        for ee_ai in elastic_energy:
+                            file.write("{0} \n".format(0))
+                        for i in range(8):
+                            file.write("1 \n") # boundary corners
+                        
+                        file.write("SCALARS elastic_energy float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')                    
+                        for ee_ai in elastic_energy:
+                            file.write("{:.4f} \n".format(ee_ai))
                         for i in range(8):
                             file.write("0.0 \n") # boundary corners
+                            
+                        file.write("SCALARS alignment float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')                    
+                        for a_ai in alignment:
+                            file.write("{:.4f} \n".format(a_ai))
+                        for i in range(8):
+                            file.write("0.0 \n") # boundary corners
+                            
+                        file.write("SCALARS gel_conc float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')                    
+                        for gc_ai in gel_conc:
+                            file.write("{:.4f} \n".format(gc_ai))
+                        for i in range(8):
+                            file.write("0.0 \n") # boundary corners
+                                                
+                        for s in range(N_SPECIES):                    
+                            file.write("SCALARS concentration_species_{0} float 1 \n".format(s))
+                            file.write("LOOKUP_TABLE default" + '\n')
+                            
+                            for c_ai in concentration_multi:
+                                file.write("{:.4f} \n".format(c_ai[s]))
+                            for i in range(8):
+                                file.write("0.0 \n") # boundary corners
+                            
+                        file.write("VECTORS velocity float" + '\n')                    
+                        for v_ai in velocity:
+                            file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0],v_ai[1],v_ai[2]))
+                        for i in range(8):
+                            file.write("0.0 0.0 0.0 \n") # boundary corners
+                            
+                        file.write("VECTORS force float" + '\n')                    
+                        for f_ai in force:
+                            file.write("{:.4f} {:.4f} {:.4f} \n".format(f_ai[0],f_ai[1],f_ai[2]))
+                        for i in range(8):
+                            file.write("0.0 0.0 0.0 \n") # boundary corners
                         
-                    file.write("VECTORS velocity float" + '\n')                    
-                    for v_ai in velocity:
-                        file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0],v_ai[1],v_ai[2]))
-                    for i in range(8):
-                        file.write("0.0 0.0 0.0 \n") # boundary corners
-                        
-                    file.write("VECTORS force float" + '\n')                    
-                    for f_ai in force:
-                        file.write("{:.4f} {:.4f} {:.4f} \n".format(f_ai[0],f_ai[1],f_ai[2]))
-                    for i in range(8):
-                        file.write("0.0 0.0 0.0 \n") # boundary corners
-                    
-                    file.write("VECTORS orientation float" + '\n')                    
-                    for o_ai in orientation:
-                        file.write("{:.4f} {:.4f} {:.4f} \n".format(o_ai[0],o_ai[1],o_ai[2]))
-                    for i in range(8):
-                        file.write("0.0 0.0 0.0 \n") # boundary corners
-                      
+                        file.write("VECTORS orientation float" + '\n')                    
+                        for o_ai in orientation:
+                            file.write("{:.4f} {:.4f} {:.4f} \n".format(o_ai[0],o_ai[1],o_ai[2]))
+                        for i in range(8):
+                            file.write("0.0 0.0 0.0 \n") # boundary corners
+                          
 
-                print ("... succesful save ")
-                print ("=================================")
+                    print ("... succesful save ")
+                    print ("=================================")
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
 
 
 class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunction):
     def __init__(self):
-        super().__init__()
-    def run(self, FLAMEGPU):    
-        global BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
-        stepCounter = FLAMEGPU.getStepCounter() + 1;
-        if stepCounter == 2: # after first step BOUNDARY_CONC_INIT_MULTI is removed (set to -1.0) and BOUNDARY_CONC_FIXED_MULTI prevails
-            print ("====== CONCENTRATION MULTI BOUNDARY CONDITIONS SET  ======")                 
-            print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT_MULTI)
-            print ("Fixed concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_FIXED_MULTI)
-            for i in range(len(BOUNDARY_CONC_INIT_MULTI)):
-                for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
-                    BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0               
-            resetMacroProperties(self,FLAMEGPU)
+        try: 
+            super().__init__()
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
+    def run(self, FLAMEGPU):   
+        try: 
+            global BOUNDARY_CONC_INIT_MULTI, BOUNDARY_CONC_FIXED_MULTI
+            stepCounter = FLAMEGPU.getStepCounter() + 1;
+            if stepCounter == 2: # after first step BOUNDARY_CONC_INIT_MULTI is removed (set to -1.0) and BOUNDARY_CONC_FIXED_MULTI prevails
+                print ("====== CONCENTRATION MULTI BOUNDARY CONDITIONS SET  ======")                 
+                print ("Initial concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_INIT_MULTI)
+                print ("Fixed concentration boundary conditions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_CONC_FIXED_MULTI)
+                for i in range(len(BOUNDARY_CONC_INIT_MULTI)):
+                    for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
+                        BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0               
+                resetMacroProperties(self,FLAMEGPU)
+        except Exception as err:
+            traceback.print_exception(*sys.exc_info())
+            raise
 
 
 if INCLUDE_DIFFUSION:
