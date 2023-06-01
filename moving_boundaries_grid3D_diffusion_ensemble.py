@@ -1038,7 +1038,9 @@ class SaveDataToFile(pyflamegpu.HostFunction):
         global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
         global RES_PATH, ENSEMBLE
         global fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
-        global BUCKLING_COEFF_D0, STRAIN_STIFFENING_COEFF_DS, CRITICAL_STRAIN
+        BUCKLING_COEFF_D0 = FLAMEGPU.environment.getPropertyFloat("BUCKLING_COEFF_D0")
+        STRAIN_STIFFENING_COEFF_DS = FLAMEGPU.environment.getPropertyFloat("STRAIN_STIFFENING_COEFF_DS")
+        CRITICAL_STRAIN = FLAMEGPU.environment.getPropertyFloat("CRITICAL_STRAIN")
         stepCounter = FLAMEGPU.getStepCounter() + 1;
         
         if SAVE_DATA_TO_FILE:
