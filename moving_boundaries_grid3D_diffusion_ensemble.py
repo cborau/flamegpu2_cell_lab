@@ -74,9 +74,9 @@ start_time = time.time()
 #| GLOBAL PARAMETERS                                                  |
 #+====================================================================+
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
-ENSEMBLE = True;
+ENSEMBLE = False;
 ENSEMBLE_RUNS = 0;
-VISUALISATION = False;         # Change to false if pyflamegpu has not been built with visualisation support
+VISUALISATION = True;         # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
@@ -98,18 +98,19 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.01; # seconds
-STEPS = 1600;
+TIME_STEP = 0.02; # seconds
+STEPS = 160;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
-ECM_K_ELAST = 20;            #[N/units/kg]
-ECM_D_DUMPING = 4;          #[N*s/units/kg]
+ECM_K_ELAST = 20.0;           #[N/units/kg]
+ECM_D_DUMPING = 4.0;          #[N*s/units/kg]
 ECM_MASS = 1.0;               #[dimensionless to make K and D mass dependent]
 ECM_GEL_CONCENTRATION = 1.0;  #[dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5]; #+X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+#BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
@@ -128,8 +129,10 @@ ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 INCLUDE_FIBER_ALIGNMENT = True; 
 ECM_ORIENTATION_RATE = 0.1 / (ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);   #[1/seconds]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces 
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
-MAX_SEARCH_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-print("MAX_SEARCH_RADIUS [units]: ", MAX_SEARCH_RADIUS)
+MAX_SEARCH_RADIUS_VASCULARIZATION = ECM_ECM_EQUILIBRIUM_DISTANCE;   # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
+MAX_SEARCH_RADIUS_CELLS = 2 * ECM_ECM_EQUILIBRIUM_DISTANCE;
+print("MAX_SEARCH_RADIUS for VASCULARIZATION [units]: ", MAX_SEARCH_RADIUS_VASCULARIZATION);
+print("MAX_SEARCH_RADIUS for CELLS [units]: ", MAX_SEARCH_RADIUS_CELLS);
 OSCILLATORY_SHEAR_ASSAY = False; #if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 OSCILLATORY_AMPLITUDE = 0.25;    # range [0-1]
 OSCILLATORY_FREQ = 0.1;          # strain oscillation frequency [s^-1]
@@ -169,8 +172,10 @@ VASCULARIZATION_POINTS_COORDS = None;                             # declared her
 
 # Cell agent related paramenters
 #+--------------------------------------------------------------------+
-INCLUDE_CELLS = False;
-N_CELLS = 100;
+INCLUDE_CELLS = True;
+N_CELLS = 5;
+CELL_K_ELAST = 50.0;             #[N/units/kg]
+CELL_D_DUMPING = 4.0;            #[N*s/units/kg]
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 #+--------------------------------------------------------------------+
@@ -280,6 +285,7 @@ ecm_output_grid_location_data_file = "ecm_output_grid_location_data.cpp";
 ecm_boundary_interaction_file = "ecm_boundary_interaction.cpp";
 ecm_ecm_interaction_file = "ecm_ecm_interaction_grid3D.cpp";
 ecm_vascularization_interaction_file = "ecm_vascularization_interaction.cpp";
+ecm_cell_interaction_file = "ecm_cell_interaction.cpp";
 ecm_boundary_concentration_conditions_file = "ecm_boundary_concentration_conditions.cpp";
 
 """
@@ -355,6 +361,11 @@ env.newPropertyFloat("ECM_BOUNDARY_EQUILIBRIUM_DISTANCE", ECM_BOUNDARY_EQUILIBRI
 env.newMacroPropertyFloat("BOUNDARY_CONC_INIT_MULTI", N_SPECIES, 6); # a 2D matrix with the 6 boundary conditions (columns) for each species (rows)
 env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES, 6); # a 2D matrix with the 6 boundary conditions (columns) for each species (rows)
 
+# Cell properties
+env.newPropertyFloat("CELL_K_ELAST", CELL_K_ELAST);
+env.newPropertyFloat("CELL_D_DUMPING", CELL_D_DUMPING);
+env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
+
 # Other globals
 env.newPropertyFloat("PI", 3.1415);
 env.newPropertyUInt("DEBUG_PRINTING", DEBUG_PRINTING);
@@ -373,7 +384,7 @@ bcorner_location_message.newVariableInt("id");
 
 vascularization_location_message = model.newMessageSpatial3D("vascularization_location_message");
 # Set the range and bounds.
-vascularization_location_message.setRadius(MAX_SEARCH_RADIUS); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
+vascularization_location_message.setRadius(MAX_SEARCH_RADIUS_VASCULARIZATION); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
 vascularization_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
 vascularization_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
 vascularization_location_message.newVariableInt("id");
@@ -384,11 +395,13 @@ vascularization_location_message.newVariableArrayFloat("concentration_multi", N_
 
 cell_location_message = model.newMessageSpatial3D("cell_location_message");
 # Set the range and bounds.
-cell_location_message.setRadius(MAX_SEARCH_RADIUS); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
+cell_location_message.setRadius(MAX_SEARCH_RADIUS_CELLS); # TODO: PROPERLY DEFINE THE VALUE OF THE RADIUS
 cell_location_message.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS);
 cell_location_message.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS);
 cell_location_message.newVariableInt("id");
 cell_location_message.newVariableFloat("fmag");
+cell_location_message.newVariableFloat("k_elast");
+cell_location_message.newVariableFloat("d_dumping");
 cell_location_message.newVariableFloat("vx");
 cell_location_message.newVariableFloat("vy");
 cell_location_message.newVariableFloat("vz");
@@ -461,6 +474,8 @@ if INCLUDE_CELLS:
     cell_agent.newVariableFloat("vy");
     cell_agent.newVariableFloat("vz");
     cell_agent.newVariableFloat("fmag");
+    cell_agent.newVariableFloat("k_elast");
+    cell_agent.newVariableFloat("d_dumping");
     cell_agent.newVariableFloat("orx");
     cell_agent.newVariableFloat("ory");
     cell_agent.newVariableFloat("orz");
@@ -533,6 +548,9 @@ if INCLUDE_VASCULARIZATION:
 if INCLUDE_DIFFUSION:
     ecm_agent.newRTCFunctionFile("ecm_boundary_concentration_conditions", ecm_boundary_concentration_conditions_file); 
 ecm_agent.newRTCFunctionFile("ecm_move", ecm_move_file);
+if INCLUDE_CELLS:
+    ecm_agent.newRTCFunctionFile("ecm_cell_interaction", ecm_cell_interaction_file).setMessageInput("cell_location_message");
+
 
 """ 
   Helper functions 
@@ -812,6 +830,8 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                                      BOUNDARY_COORDS[0],BOUNDARY_COORDS[1],
                                      BOUNDARY_COORDS[2],BOUNDARY_COORDS[3],
                                      BOUNDARY_COORDS[4],BOUNDARY_COORDS[5])
+        k_elast = FLAMEGPU.environment.getPropertyFloat("CELL_K_ELAST");
+        d_dumping = FLAMEGPU.environment.getPropertyFloat("CELL_D_DUMPING");
         for i in range(N_CELLS):
             count += 1;
             instance = FLAMEGPU.agent("CELL").newAgent();
@@ -820,6 +840,8 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             instance.setVariableFloat("y", cell_pos[i, 1]);
             instance.setVariableFloat("z", cell_pos[i, 2]);
             instance.setVariableFloat("fmag", 0.0);
+            instance.setVariableFloat("k_elast", k_elast);
+            instance.setVariableFloat("d_dumping", d_dumping);
             instance.setVariableFloat("orx", cell_orientations[count, 0]);
             instance.setVariableFloat("ory", cell_orientations[count, 1]);
             instance.setVariableFloat("orz", cell_orientations[count, 2]);
@@ -1062,7 +1084,7 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                  
                 file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
                 if ENSEMBLE:
-                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D:0.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
+                    dir_name = f"BUCKLING_COEFF_D0_{BUCKLING_COEFF_D0:.3f}_STRAIN_STIFFENING_COEFF_DS_{STRAIN_STIFFENING_COEFF_DS:.3f}_CRITICAL_STRAIN_{CRITICAL_STRAIN:.3f}"
                     # Combine the base directory with the current directory name
                     file_path = RES_PATH / dir_name / file_name
                 else:
@@ -1296,33 +1318,47 @@ model.addStepFunction(mb)
 """
   Control flow
 """    
-# Layer #1: location of agents
-model.newLayer("L1").addAgentFunction("ECM", "ecm_output_grid_location_data");
-model.Layer("L1").addAgentFunction("BCORNER", "bcorner_output_location_data");
+# First set of layers: location of agents
+layer_count = 1
+model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_output_grid_location_data");
+model.Layer("L" + str(layer_count)).addAgentFunction("BCORNER", "bcorner_output_location_data");
 if INCLUDE_VASCULARIZATION:
-    model.Layer("L1").addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
+    model.Layer("L" + str(layer_count)).addAgentFunction("VASCULARIZATION", "vascularization_output_location_data");
 if INCLUDE_CELLS:
-    model.Layer("L1").addAgentFunction("CELL", "cell_output_location_data");
-# Layer #2
-model.newLayer("L2").addAgentFunction("ECM", "ecm_boundary_interaction");
-# Layer #3
+    model.Layer("L" + str(layer_count)).addAgentFunction("CELL", "cell_output_location_data");
+
+layer_count += 1
+# Second set of layers: interactions
+model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_boundary_interaction");
+layer_count += 1
 if INCLUDE_DIFFUSION:
-    model.newLayer("L3").addAgentFunction("ECM","ecm_boundary_concentration_conditions");
-# Layer #4
+    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM","ecm_boundary_concentration_conditions");
+    layer_count += 1
 if INCLUDE_VASCULARIZATION:
-    model.newLayer("L4").addAgentFunction("ECM", "ecm_vascularization_interaction");
-# Layer #5
-model.newLayer("L5").addAgentFunction("ECM", "ecm_ecm_interaction");
-# Layer #6
-if INCLUDE_DIFFUSION:
-    model.newLayer("L6").addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
-# Layer #7: movement of agents
-model.newLayer("L7").addAgentFunction("ECM", "ecm_move");
-model.Layer("L7").addAgentFunction("BCORNER", "bcorner_move");
-if INCLUDE_VASCULARIZATION:
-    model.newLayer("L8").addAgentFunction("VASCULARIZATION", "vascularization_move");
+    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_vascularization_interaction");
+    layer_count += 1
 if INCLUDE_CELLS:
-    model.newLayer("L9").addAgentFunction("CELL", "cell_move");
+    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_cell_interaction");
+    layer_count += 1
+
+model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_ecm_interaction");
+layer_count += 1
+
+# Third set of layers: diffusion from boundaries
+if INCLUDE_DIFFUSION:
+    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM","ecm_boundary_concentration_conditions"); #called twice to ensure concentration at boundaries is properly shown visually
+    layer_count += 1
+
+# Fourth set of layers: agent movement
+model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_move");
+model.Layer("L" + str(layer_count)).addAgentFunction("BCORNER", "bcorner_move");
+layer_count += 1
+if INCLUDE_VASCULARIZATION:
+    model.newLayer("L" + str(layer_count)).addAgentFunction("VASCULARIZATION", "vascularization_move");
+    layer_count += 1
+if INCLUDE_CELLS:
+    model.newLayer("L" + str(layer_count)).addAgentFunction("CELL", "cell_move");
+    layer_count += 1
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);

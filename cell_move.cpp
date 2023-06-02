@@ -8,9 +8,13 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageArray3D, flamegpu::MessageNo
   float agent_x = FLAMEGPU->getVariable<float>("x");
   float agent_y = FLAMEGPU->getVariable<float>("y");
   float agent_z = FLAMEGPU->getVariable<float>("z");
-  float agent_vx = 0.0;
-  float agent_vy = 0.0;
-  float agent_vz = 0.0;
+  float agent_vx = FLAMEGPU->getVariable<float>("vx");
+  float agent_vy = FLAMEGPU->getVariable<float>("vy");
+  float agent_vz = FLAMEGPU->getVariable<float>("vz");
+  float agent_orx = FLAMEGPU->getVariable<float>("orx");
+  float agent_ory = FLAMEGPU->getVariable<float>("ory");
+  float agent_orz = FLAMEGPU->getVariable<float>("orz");
+  float agent_k_elast = FLAMEGPU->getVariable<float>("k_elast");
   
   // Get number of agents per direction
   const int Nx = FLAMEGPU->environment.getProperty<int>("ECM_AGENTS_PER_DIR",0);
@@ -65,16 +69,15 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageArray3D, flamegpu::MessageNo
                
     if (distance < min_distance) {	
 		min_distance = distance;
-		agent_vx = message_vx;
-		agent_vy = message_vy;
-		agent_vz = message_vz;		
+		//agent_vx = message_vx;
+		//agent_vy = message_vy;
+		//agent_vz = message_vz;
+		agent_vx = 0.0;
+		agent_vy = 0.0;
+		agent_vz = 0.0; // TODO: cell migration and orientation aligment with fibers
     }  
   }
-  //if (agent_vy > 0){
-    //printf("VASC move ID: %d, min_dist: %g, pos -> (%g, %g, %g), vel -> (%g, %g, %g)\n", id, min_distance, agent_x, agent_y, agent_z, agent_vx, agent_vy, agent_vz);
-  //}
-  //printf("VASC BEFORE move ID: %d, min_dist: %g, pos -> (%g, %g, %g), vel -> (%g, %g, %g)\n", id, min_distance, agent_x, agent_y, agent_z, agent_vx, agent_vy, agent_vz);
-
+ 
   agent_x += agent_vx * DELTA_TIME;
   agent_y += agent_vy * DELTA_TIME;
   agent_z += agent_vz * DELTA_TIME;
