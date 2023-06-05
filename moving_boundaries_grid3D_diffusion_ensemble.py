@@ -82,7 +82,7 @@ PAUSE_EVERY_STEP = False;     # If True, the visualization stops every step unti
 SAVE_PICKLE = True;           # If True, dumps agent and boudary force data into a pickle file for post-processing
 SHOW_PLOTS = False;           # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = True;     # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 200;     # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 1;     # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -98,8 +98,8 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 #+--------------------------------------------------------------------+
-TIME_STEP = 0.02; # seconds
-STEPS = 160;
+TIME_STEP = 0.01; # seconds
+STEPS = 60;
 
 # Boundray interactions and mechanical parameters
 #+--------------------------------------------------------------------+
@@ -115,11 +115,11 @@ BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 POISSON_DIRS = [0, 1] # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0]; # [bool]
 RELATIVE_BOUNDARY_STIFFNESS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0];  
-BOUNDARY_STIFFNESS_VALUE = 1.0 # N/units
-BOUNDARY_DUMPING_VALUE = 0.0
+BOUNDARY_STIFFNESS_VALUE = 10.0 # N/units
+BOUNDARY_DUMPING_VALUE = 5.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE*x for x in RELATIVE_BOUNDARY_STIFFNESS]
-CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0]; #+X,-X,+Y,-Y,+Z,-Z [bool]
+CLAMP_AGENT_TOUCHING_BOUNDARY = [1, 1, 1, 1, 1, 1]; #+X,-X,+Y,-Y,+Z,-Z [bool]
 ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];           #+X,-X,+Y,-Y,+Z,-Z [bool]
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1])  / (N - 1);
 print("ECM_ECM_EQUILIBRIUM_DISTANCE [units]: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
@@ -173,8 +173,9 @@ VASCULARIZATION_POINTS_COORDS = None;                             # declared her
 # Cell agent related paramenters
 #+--------------------------------------------------------------------+
 INCLUDE_CELLS = True;
-N_CELLS = 5;
-CELL_K_ELAST = 50.0;             #[N/units/kg]
+INCLUDE_CELL_ORIENTATION = True;
+N_CELLS = 1;
+CELL_K_ELAST = 20.0;             #[N/units/kg]
 CELL_D_DUMPING = 4.0;            #[N*s/units/kg]
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
@@ -362,6 +363,7 @@ env.newMacroPropertyFloat("BOUNDARY_CONC_INIT_MULTI", N_SPECIES, 6); # a 2D matr
 env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES, 6); # a 2D matrix with the 6 boundary conditions (columns) for each species (rows)
 
 # Cell properties
+env.newPropertyUInt("INCLUDE_CELL_ORIENTATION", INCLUDE_CELL_ORIENTATION);
 env.newPropertyFloat("CELL_K_ELAST", CELL_K_ELAST);
 env.newPropertyFloat("CELL_D_DUMPING", CELL_D_DUMPING);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
@@ -825,7 +827,8 @@ class initAgentPopulations(pyflamegpu.HostFunction):
         current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
         current_id += 1;
         count = -1;
-        cell_orientations = getRandomVectors3D(N_CELLS)
+        #cell_orientations = getRandomVectors3D(N_CELLS)
+        cell_orientations = np.array([[0.0,1.0,0.0]], dtype='float')
         cell_pos = getRandomCoords3D(N_CELLS,
                                      BOUNDARY_COORDS[0],BOUNDARY_COORDS[1],
                                      BOUNDARY_COORDS[2],BOUNDARY_COORDS[3],
@@ -836,9 +839,12 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             count += 1;
             instance = FLAMEGPU.agent("CELL").newAgent();
             instance.setVariableInt("id", current_id + count);
-            instance.setVariableFloat("x", cell_pos[i, 0]);
-            instance.setVariableFloat("y", cell_pos[i, 1]);
-            instance.setVariableFloat("z", cell_pos[i, 2]);
+            #instance.setVariableFloat("x", cell_pos[i, 0]);
+            #instance.setVariableFloat("y", cell_pos[i, 1]);
+            #instance.setVariableFloat("z", cell_pos[i, 2]);
+            instance.setVariableFloat("x", 0.0);
+            instance.setVariableFloat("y", 0.0);
+            instance.setVariableFloat("z", 0.0);
             instance.setVariableFloat("fmag", 0.0);
             instance.setVariableFloat("k_elast", k_elast);
             instance.setVariableFloat("d_dumping", d_dumping);
@@ -1026,6 +1032,8 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                 if j > 0:
                     cube_conn[i][j] = cube_conn[i][j] + N*N*N
             self.domaindata.append(' '.join(str(x) for x in cube_conn[i]))
+
+        # TODO: ADD CELL AGENTS
             
         #self.domaindata.append("4 0 3 7 4")
         #self.domaindata.append("4 1 2 6 5")
@@ -1337,12 +1345,13 @@ if INCLUDE_DIFFUSION:
 if INCLUDE_VASCULARIZATION:
     model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_vascularization_interaction");
     layer_count += 1
-if INCLUDE_CELLS:
-    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_cell_interaction");
-    layer_count += 1
 
 model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_ecm_interaction");
 layer_count += 1
+
+if INCLUDE_CELLS:
+    model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_cell_interaction");
+    layer_count += 1
 
 # Third set of layers: diffusion from boundaries
 if INCLUDE_DIFFUSION:

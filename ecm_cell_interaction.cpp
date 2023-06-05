@@ -61,6 +61,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
   const float MAX_SEARCH_RADIUS_CELLS = FLAMEGPU->environment.getProperty<float>("MAX_SEARCH_RADIUS_CELLS");
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
+  int INCLUDE_CELL_ORIENTATION = FLAMEGPU->environment.getProperty<int>("INCLUDE_CELL_ORIENTATION");
   
   int message_id = 0;
   float message_x = 0.0;
@@ -117,51 +118,61 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
     dir_x = agent_x - message_x; 
     dir_y = agent_y - message_y; 
     dir_z = agent_z - message_z; 
-    distance = vec3Length(dir_x, dir_y, dir_z);    
+    distance = vec3Length(dir_x, dir_y, dir_z); 
 
-	// angles between agent orientation and the direction joining agents.
-    angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
-	cos_ori_agent = 1.0; // ECM orientation is neglected here. Only cell orientation matters. 
-	cos_ori_message = fabsf(cosf(angle_message_ori_dir));
+	if (distance < MAX_SEARCH_RADIUS_CELLS) {
+		// angles between agent orientation and the direction joining agents.
+		angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
+		cos_ori_agent = 1.0; // ECM orientation is neglected here. Only cell orientation matters. 
+		cos_ori_message = fabsf(cosf(angle_message_ori_dir));
 		
+		if (INCLUDE_CELL_ORIENTATION != 1){
+			cos_ori_message = 1.0;
+		}
+			
 
-	if (cos_ori_message < EPSILON){
-		cos_ori_message = EPSILON;
-	}	
-	
-	cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
-    cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
-    cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
-	
-	// angles between agent & message velocity vector and the direction joining them		
-	angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
-	angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
+		if (cos_ori_message < EPSILON){
+			cos_ori_message = EPSILON;
+		}	
+		
+		cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
+		cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
+		cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
+		
+		// angles between agent & message velocity vector and the direction joining them		
+		angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
+		angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
 
-    // relative speed <0 means particles are getting closer
-    relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
-    // if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive
-    total_f = (MAX_SEARCH_RADIUS_CELLS - distance) * (message_k_elast) + message_d_dumping * relative_speed;
-	total_f *= cos_ori_message;
-	
-	printf("ECM agent %d - cell %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
-	
-	
-	if (total_f < 0) {
-        agent_f_compression += total_f;
-    }
-    else {
-        agent_f_extension += total_f;
-		// store the absolute extensions in each direction
-		agent_fx_abs += fabsf(total_f * cos_x);
-		agent_fy_abs += fabsf(total_f * cos_y);
-		agent_fz_abs += fabsf(total_f * cos_z);
-    }
+		// relative speed <0 means particles are getting closer
+		relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
+		// if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive
+		total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (message_k_elast) + message_d_dumping * relative_speed;
+		total_f *= cos_ori_message;
+		
+		printf("ECM agent %d - cell %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
+		
+		
+		if (total_f < 0) {
+			agent_f_compression += total_f;
+		}
+		else {
+			agent_f_extension += total_f;
+			// store the absolute extensions in each direction
+			agent_fx_abs += fabsf(total_f * cos_x);
+			agent_fy_abs += fabsf(total_f * cos_y);
+			agent_fz_abs += fabsf(total_f * cos_z);
+		}
 
-    agent_elastic_energy += 0.5 * (total_f * total_f) / message_k_elast;
+		agent_elastic_energy += 0.5 * (total_f * total_f) / message_k_elast;
 
-    agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
-    agent_fy += -1 * total_f * cos_y;
-    agent_fz += -1 * total_f * cos_z;
+		agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
+		agent_fy += -1 * total_f * cos_y;
+		agent_fz += -1 * total_f * cos_z;
+  
+    }	
+	
+	
+	
 
   }
   
