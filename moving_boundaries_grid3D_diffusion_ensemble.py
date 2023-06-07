@@ -364,6 +364,7 @@ env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES, 6); # a 2D mat
 
 # Cell properties
 env.newPropertyUInt("INCLUDE_CELL_ORIENTATION", INCLUDE_CELL_ORIENTATION);
+env.newPropertyUInt("N_CELLS", N_CELLS);
 env.newPropertyFloat("CELL_K_ELAST", CELL_K_ELAST);
 env.newPropertyFloat("CELL_D_DUMPING", CELL_D_DUMPING);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
@@ -1015,7 +1016,7 @@ class MoveBoundaries(pyflamegpu.HostFunction):
 
 class SaveDataToFile(pyflamegpu.HostFunction):
     def __init__(self):
-        global N, N_VASCULARIZATION_POINTS
+        global N, N_VASCULARIZATION_POINTS, N_CELLS
         super().__init__()
         self.header = list()
         self.header.append("# vtk DataFile Version 3.0")
@@ -1033,8 +1034,6 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                     cube_conn[i][j] = cube_conn[i][j] + N*N*N
             self.domaindata.append(' '.join(str(x) for x in cube_conn[i]))
 
-        # TODO: ADD CELL AGENTS
-            
         #self.domaindata.append("4 0 3 7 4")
         #self.domaindata.append("4 1 2 6 5")
         #self.domaindata.append("4 1 0 4 5")
@@ -1057,17 +1056,24 @@ class SaveDataToFile(pyflamegpu.HostFunction):
         self.domaindata.append("0 -1 0")
         self.domaindata.append("0 0 1")
         self.domaindata.append("0 0 -1")
+        # VASCULARIZATION
         self.vascularizationdata = list() # a different file is created to show the position of the vascularization points
         self.vascularizationdata.append("# vtk DataFile Version 3.0")
         self.vascularizationdata.append("Vascularization points")
         self.vascularizationdata.append("ASCII") 
-        self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")        
-        
- 
+        self.vascularizationdata.append("DATASET UNSTRUCTURED_GRID")
+        # CELLS
+        self.celldata = list()  # a different file is created to show cell agent data
+        self.celldata.append("# vtk DataFile Version 3.0")
+        self.celldata.append("Cell agents")
+        self.celldata.append("ASCII")
+        self.celldata.append("DATASET UNSTRUCTURED_GRID")
+
     def run(self, FLAMEGPU):
         global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
         global RES_PATH, ENSEMBLE
         global fileCounter, BOUNDARY_COORDS,INCLUDE_VASCULARIZATION
+        global INCLUDE_CELLS
         global BUCKLING_COEFF_D0, STRAIN_STIFFENING_COEFF_DS, CRITICAL_STRAIN
         stepCounter = FLAMEGPU.getStepCounter() + 1;
         
@@ -1089,6 +1095,35 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                         file.write("POINTS {} float \n".format(FLAMEGPU.environment.getPropertyUInt("N_VASCULARIZATION_POINTS"))) #number of vascularization agents                            
                         for coords_ai in vasc_coords:
                             file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
+
+                if INCLUDE_CELLS:
+                    cell_coords = list()
+                    cell_velocity = list()
+                    cell_orientation = list()
+                    file_name = 'cells_t{:04d}.vtk'.format(stepCounter)
+                    file_path = RES_PATH / file_name
+                    cell_agent = FLAMEGPU.agent("CELL");
+                    av = cell_agent.getPopulationData(); # this returns a DeviceAgentVector
+                    for ai in av:
+                        coords_ai = (ai.getVariableFloat("x"), ai.getVariableFloat("y"), ai.getVariableFloat("z"))
+                        velocity_ai = (ai.getVariableFloat("vx"), ai.getVariableFloat("vy"), ai.getVariableFloat("vz"))
+                        orientation_ai = (ai.getVariableFloat("orx"), ai.getVariableFloat("ory"), ai.getVariableFloat("orz"))
+                        cell_coords.append(coords_ai)
+                        cell_velocity.append(velocity_ai)
+                        cell_orientation.append(orientation_ai)
+                    with open(str(file_path), 'w') as file:
+                        for line in self.celldata:
+                            file.write(line  + '\n')
+                        file.write("POINTS {} float \n".format(FLAMEGPU.environment.getPropertyUInt("N_CELLS"))) #number of vascularization agents
+                        for coords_ai in cell_coords:
+                            file.write("{} {} {} \n".format(coords_ai[0],coords_ai[1],coords_ai[2]))
+                        file.write("POINT_DATA {} \n".format(FLAMEGPU.environment.getPropertyUInt("N_CELLS")))  # 8 corners + number of ECM agents
+                        file.write("VECTORS velocity float" + '\n')
+                        for v_ai in cell_velocity:
+                            file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0], v_ai[1], v_ai[2]))
+                        file.write("VECTORS orientation float" + '\n')
+                        for o_ai in cell_orientation:
+                            file.write("{:.4f} {:.4f} {:.4f} \n".format(o_ai[0], o_ai[1], o_ai[2]))
                  
                 file_name = 'ecm_data_t{:04d}.vtk'.format(stepCounter)
                 if ENSEMBLE:
