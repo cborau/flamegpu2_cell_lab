@@ -74,7 +74,7 @@ start_time = time.time()
 # | GLOBAL PARAMETERS                                                  |
 # +====================================================================+
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
-ENSEMBLE = False;
+ENSEMBLE = True;
 ENSEMBLE_RUNS = 0;
 VISUALISATION = True;  # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
@@ -82,7 +82,7 @@ PAUSE_EVERY_STEP = False;  # If True, the visualization stops every step until P
 SAVE_PICKLE = True;  # If True, dumps agent and boudary force data into a pickle file for post-processing
 SHOW_PLOTS = False;  # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = True;  # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 1;  # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 200;  # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -99,7 +99,7 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 # Time simulation parameters
 # +--------------------------------------------------------------------+
 TIME_STEP = 0.01;  # seconds
-STEPS = 60;
+STEPS = 16000;
 
 # Boundray interactions and mechanical parameters
 # +--------------------------------------------------------------------+
@@ -110,19 +110,17 @@ ECM_GEL_CONCENTRATION = 1.0;  # [dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5];  # +X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0,
                        0.0];  # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-# BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                0.0];  # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+#BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];  # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
 
-POISSON_DIRS = [0,
-                1]  # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
+POISSON_DIRS = [0, 1]  # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0];  # [bool]
 RELATIVE_BOUNDARY_STIFFNESS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
 BOUNDARY_STIFFNESS_VALUE = 10.0  # N/units
 BOUNDARY_DUMPING_VALUE = 5.0
 BOUNDARY_STIFFNESS = [BOUNDARY_STIFFNESS_VALUE * x for x in RELATIVE_BOUNDARY_STIFFNESS]
 BOUNDARY_DUMPING = [BOUNDARY_DUMPING_VALUE * x for x in RELATIVE_BOUNDARY_STIFFNESS]
-CLAMP_AGENT_TOUCHING_BOUNDARY = [1, 1, 1, 1, 1, 1];  # +X,-X,+Y,-Y,+Z,-Z [bool]
+CLAMP_AGENT_TOUCHING_BOUNDARY = [0, 0, 1, 1, 0, 0];  # +X,-X,+Y,-Y,+Z,-Z [bool]
 ALLOW_AGENT_SLIDING = [0, 0, 0, 0, 0, 0];  # +X,-X,+Y,-Y,+Z,-Z [bool]
 ECM_ECM_EQUILIBRIUM_DISTANCE = (BOUNDARY_COORDS[0] - BOUNDARY_COORDS[1]) / (N - 1);
 print("ECM_ECM_EQUILIBRIUM_DISTANCE [units]: ", ECM_ECM_EQUILIBRIUM_DISTANCE)
@@ -179,7 +177,7 @@ VASCULARIZATION_POINTS_COORDS = None;  # declared here. Coords loaded from file
 
 # Cell agent related paramenters
 # +--------------------------------------------------------------------+
-INCLUDE_CELLS = True;
+INCLUDE_CELLS = False;
 INCLUDE_CELL_ORIENTATION = True;
 N_CELLS = 1;
 CELL_K_ELAST = 20.0;  # [N/units/kg]
@@ -1451,7 +1449,7 @@ if INCLUDE_CELLS:
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model);
 logging_config.logEnvironment("CURRENT_ID");
-logging_config.logEnvironment("BOUNDARY_COORDS");
+logging_config.logEnvironment("COORDS_BOUNDARIES");
 ecm_agent_log = logging_config.agent("ECM");
 ecm_agent_log.logCount();
 ecm_agent_log.logSumFloat("f_bx_pos");
