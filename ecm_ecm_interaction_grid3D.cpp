@@ -187,7 +187,7 @@ FLAMEGPU_DEVICE_FUNCTION float getStrainKfactor(const float strain, const float 
 	// returns the factor multiplying the elastic constant depending on fiber strain
 	float factor = 1.0;
 	if (strain < 0.0) {
-	   //factor = expf(strain / d_0);
+	   factor = expf(strain / d_0);
 	   factor = 1.0;
 	}
 	else if(strain <= strain_s) {

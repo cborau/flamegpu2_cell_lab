@@ -1398,8 +1398,8 @@ if ENSEMBLE:
 
   # Create the first dimension of the parameter sweep
   runs_final = pyflamegpu.RunPlanVector(model, 0)
-  for tBUCKLING_COEFF_D0 in np.linspace(0.0, 2.0, 5):
-      for tSTRAIN_STIFFENING_COEFF_DS in np.linspace(0.0, 2.0, 5):
+  for tBUCKLING_COEFF_D0 in np.linspace(0.2, 2.0, 5):
+      for tSTRAIN_STIFFENING_COEFF_DS in np.linspace(0.2, 2.0, 5):
           for tCRITICAL_STRAIN in np.linspace(0.0, 1.0, 5):
               run_control.setPropertyFloat("BUCKLING_COEFF_D0", tBUCKLING_COEFF_D0);
               run_control.setPropertyFloat("STRAIN_STIFFENING_COEFF_DS", tSTRAIN_STIFFENING_COEFF_DS);
