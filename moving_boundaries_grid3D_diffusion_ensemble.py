@@ -76,7 +76,7 @@ start_time = time.time()
 # Set whether to run single model or ensemble, agent population size, and simulation steps 
 ENSEMBLE = True;
 ENSEMBLE_RUNS = 0;
-VISUALISATION = True;  # Change to false if pyflamegpu has not been built with visualisation support
+VISUALISATION = False;  # Change to false if pyflamegpu has not been built with visualisation support
 DEBUG_PRINTING = False;
 PAUSE_EVERY_STEP = False;  # If True, the visualization stops every step until P is pressed
 SAVE_PICKLE = True;  # If True, dumps agent and boudary force data into a pickle file for post-processing
@@ -750,9 +750,9 @@ class initAgentPopulations(pyflamegpu.HostFunction):
         agents_per_dir = FLAMEGPU.environment.getPropertyArrayUInt("ECM_AGENTS_PER_DIR");
         print("agents per dir", agents_per_dir);
         offset = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];  # +X,-X,+Y,-Y,+Z,-Z
-        coords_x = np.linspace(BOUNDARY_COORDS[1] + offset[1], BOUNDARY_COORDS[0] - offset[0], agents_per_dir[0]);
-        coords_y = np.linspace(BOUNDARY_COORDS[3] + offset[3], BOUNDARY_COORDS[2] - offset[2], agents_per_dir[1]);
-        coords_z = np.linspace(BOUNDARY_COORDS[5] + offset[5], BOUNDARY_COORDS[4] - offset[4], agents_per_dir[2]);
+        coords_x = np.linspace(coord_boundary[1] + offset[1], coord_boundary[0] - offset[0], agents_per_dir[0]);
+        coords_y = np.linspace(coord_boundary[3] + offset[3], coord_boundary[2] - offset[2], agents_per_dir[1]);
+        coords_z = np.linspace(coord_boundary[5] + offset[5], coord_boundary[4] - offset[4], agents_per_dir[2]);
         if INCLUDE_FIBER_ALIGNMENT:
             orientations = getRandomVectors3D(populationSize)
         else:
@@ -862,9 +862,9 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             # cell_orientations = getRandomVectors3D(N_CELLS)
             cell_orientations = np.array([[0.0, 1.0, 0.0]], dtype='float')
             cell_pos = getRandomCoords3D(N_CELLS,
-                                         BOUNDARY_COORDS[0], BOUNDARY_COORDS[1],
-                                         BOUNDARY_COORDS[2], BOUNDARY_COORDS[3],
-                                         BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])
+                                         coord_boundary[0], coord_boundary[1],
+                                         coord_boundary[2], coord_boundary[3],
+                                         coord_boundary[4], coord_boundary[5])
             k_elast = FLAMEGPU.environment.getPropertyFloat("CELL_K_ELAST");
             d_dumping = FLAMEGPU.environment.getPropertyFloat("CELL_D_DUMPING");
             for i in range(N_CELLS):
@@ -945,14 +945,15 @@ class MoveBoundaries(pyflamegpu.HostFunction):
     # Override C++ method: virtual void run(FLAMEGPU_HOST_API*);
     def run(self, FLAMEGPU):
         stepCounter = FLAMEGPU.getStepCounter() + 1;
-        global BOUNDARY_COORDS, BOUNDARY_DISP_RATES, ALLOW_BOUNDARY_ELASTIC_MOVEMENT, BOUNDARY_STIFFNESS, BOUNDARY_DUMPING, BPOS_OVER_TIME
+        global BOUNDARY_DISP_RATES, ALLOW_BOUNDARY_ELASTIC_MOVEMENT, BOUNDARY_STIFFNESS, BOUNDARY_DUMPING, BPOS_OVER_TIME
         global CLAMP_AGENT_TOUCHING_BOUNDARY, OSCILLATORY_SHEAR_ASSAY, OSCILLATORY_AMPLITUDE, OSCILLATORY_W, OSCILLATORY_STRAIN_OVER_TIME
         global DEBUG_PRINTING, PAUSE_EVERY_STEP, TIME_STEP
 
         boundaries_moved = False
         if PAUSE_EVERY_STEP:
             input()  # pause everystep
-
+    
+        coord_boundary = list(FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES"))
         if OSCILLATORY_SHEAR_ASSAY:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 new_val = pd.DataFrame([OSOT(OSCILLATORY_AMPLITUDE * math.sin(OSCILLATORY_W * stepCounter))]);
@@ -986,30 +987,30 @@ class MoveBoundaries(pyflamegpu.HostFunction):
             for i in range(6):
                 if CLAMP_AGENT_TOUCHING_BOUNDARY[i] < 1:
                     if ALLOW_BOUNDARY_ELASTIC_MOVEMENT[i] > 0:
-                        BOUNDARY_COORDS[i] = minmax_positions[i] + boundary_equil_distances[i]
+                        coord_boundary[i] = minmax_positions[i] + boundary_equil_distances[i]
                     else:
-                        BOUNDARY_COORDS[i] = minmax_positions[i]
+                        coord_boundary[i] = minmax_positions[i]
 
-            bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4],
-                   BOUNDARY_COORDS[5]]  # +X,-X,+Y,-Y,+Z,-Z
+            bcs = [coord_boundary[0], coord_boundary[1], coord_boundary[2], coord_boundary[3], coord_boundary[4],
+                   coord_boundary[5]]  # +X,-X,+Y,-Y,+Z,-Z
             FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
 
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 print("====== MOVING FREE BOUNDARIES  ======")
-                print("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+                print("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", coord_boundary)
                 print("=====================================")
 
         if any(dr > 0.0 or dr < 0.0 for dr in BOUNDARY_DISP_RATES):
             boundaries_moved = True
             for i in range(6):
-                BOUNDARY_COORDS[i] += (BOUNDARY_DISP_RATES[i] * TIME_STEP)
+                coord_boundary[i] += (BOUNDARY_DISP_RATES[i] * TIME_STEP)
 
-            bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4],
-                   BOUNDARY_COORDS[5]]  # +X,-X,+Y,-Y,+Z,-Z
+            bcs = [coord_boundary[0], coord_boundary[1], coord_boundary[2], coord_boundary[3], coord_boundary[4],
+                   coord_boundary[5]]  # +X,-X,+Y,-Y,+Z,-Z
             FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 print("====== MOVING BOUNDARIES DUE TO CONDITIONS ======")
-                print("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+                print("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", coord_boundary)
                 print("=================================================")
 
         # if any(abem > 0 for abem in ALLOW_BOUNDARY_ELASTIC_MOVEMENT):
@@ -1029,17 +1030,17 @@ class MoveBoundaries(pyflamegpu.HostFunction):
         #           #u = boundary_forces[i] / BOUNDARY_STIFFNESS[i]
         #           u = (boundary_forces[i] * TIME_STEP)/ (BOUNDARY_STIFFNESS[i] * TIME_STEP + BOUNDARY_DUMPING[i])
         #           print ("Displacement for boundary {} = {}".format(i,u));
-        #           BOUNDARY_COORDS[i] += u
+        #           coord_boundary[i] += u
 
-        #   bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  #+X,-X,+Y,-Y,+Z,-Z
+        #   bcs = [coord_boundary[0], coord_boundary[1], coord_boundary[2], coord_boundary[3], coord_boundary[4], coord_boundary[5]]  #+X,-X,+Y,-Y,+Z,-Z
         #   FLAMEGPU.environment.setPropertyArrayFloat("COORDS_BOUNDARIES", bcs)
-        #   print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", BOUNDARY_COORDS)
+        #   print ("New boundary positions [+X,-X,+Y,-Y,+Z,-Z]: ", coord_boundary)
         #   print ("=================================================")
 
         if boundaries_moved:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-                new_pos = pd.DataFrame([BPOS(BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], BOUNDARY_COORDS[2],
-                                             BOUNDARY_COORDS[3], BOUNDARY_COORDS[4], BOUNDARY_COORDS[5])])
+                new_pos = pd.DataFrame([BPOS(coord_boundary[0], coord_boundary[1], coord_boundary[2],
+                                             coord_boundary[3], coord_boundary[4], coord_boundary[5])])
                 # BPOS_OVER_TIME = BPOS_OVER_TIME.append(new_pos, ignore_index=True)
                 BPOS_OVER_TIME = pd.concat([BPOS_OVER_TIME, new_pos], ignore_index=True);
 
@@ -1105,12 +1106,14 @@ class SaveDataToFile(pyflamegpu.HostFunction):
     def run(self, FLAMEGPU):
         global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEPS, N_SPECIES
         global RES_PATH, ENSEMBLE
-        global fileCounter, BOUNDARY_COORDS, INCLUDE_VASCULARIZATION
+        global fileCounter, INCLUDE_VASCULARIZATION
         global INCLUDE_CELLS
         BUCKLING_COEFF_D0 = FLAMEGPU.environment.getPropertyFloat("BUCKLING_COEFF_D0")
         STRAIN_STIFFENING_COEFF_DS = FLAMEGPU.environment.getPropertyFloat("STRAIN_STIFFENING_COEFF_DS")
         CRITICAL_STRAIN = FLAMEGPU.environment.getPropertyFloat("CRITICAL_STRAIN")
         stepCounter = FLAMEGPU.getStepCounter() + 1;
+        
+        coord_boundary = list(FLAMEGPU.environment.getPropertyArrayFloat("COORDS_BOUNDARIES"))
 
         if SAVE_DATA_TO_FILE:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
@@ -1223,14 +1226,14 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                     for coords_ai in coords:
                         file.write("{} {} {} \n".format(coords_ai[0], coords_ai[1], coords_ai[2]))
                     # Write boundary positions at the end so that corner points don't cover the points underneath
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]))
-                    file.write("{} {} {} \n".format(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]))
+                    file.write("{} {} {} \n".format(coord_boundary[0], coord_boundary[2], coord_boundary[4]))
+                    file.write("{} {} {} \n".format(coord_boundary[1], coord_boundary[2], coord_boundary[4]))
+                    file.write("{} {} {} \n".format(coord_boundary[1], coord_boundary[3], coord_boundary[4]))
+                    file.write("{} {} {} \n".format(coord_boundary[0], coord_boundary[3], coord_boundary[4]))
+                    file.write("{} {} {} \n".format(coord_boundary[0], coord_boundary[2], coord_boundary[5]))
+                    file.write("{} {} {} \n".format(coord_boundary[1], coord_boundary[2], coord_boundary[5]))
+                    file.write("{} {} {} \n".format(coord_boundary[1], coord_boundary[3], coord_boundary[5]))
+                    file.write("{} {} {} \n".format(coord_boundary[0], coord_boundary[3], coord_boundary[5]))
                     for line in self.domaindata:
                         file.write(line + '\n')
                     file.write("SCALARS boundary_normal_forces float 1" + '\n')
@@ -1596,34 +1599,35 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
         circ_cell_agt.setModel(pyflamegpu.ICOSPHERE);
         circ_cell_agt.setModelScale(0.09);
         circ_cell_agt.setColor(pyflamegpu.Color("#fc03e7"));
-
+        
+    coord_boundary = list(env.getPropertyArrayFloat("COORDS_BOUNDARIES"))
     pen = visualisation.newLineSketch(1, 1, 1, 0.8);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5]);
 
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5]);
 
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[4]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[2], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[0], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
-    pen.addVertex(BOUNDARY_COORDS[1], BOUNDARY_COORDS[3], BOUNDARY_COORDS[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4]);
+    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5]);
+    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5]);
+    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5]);
 
     visualisation.activate();
 
