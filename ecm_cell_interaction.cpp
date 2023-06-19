@@ -33,6 +33,7 @@ FLAMEGPU_DEVICE_FUNCTION float getAngleBetweenVec(const float x1, const float y1
   
   return angle; //in radians
 }
+// This function computes the ECM deformation (ECM agent is the caller, Cells are the messages) due to the action of cell agents. WARNING: not to be confused with cell_ecm_interaction, which includes cell reorientation after deformations
 FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flamegpu::MessageNone) {
   // Agent properties in local register
   int id = FLAMEGPU->getVariable<int>("id");
@@ -149,7 +150,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
 		total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (message_k_elast) + message_d_dumping * relative_speed;
 		total_f *= cos_ori_message;
 		
-		printf("ECM agent %d - cell %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
+		//printf("ECM agent %d - cell %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
 		
 		
 		if (total_f < 0) {

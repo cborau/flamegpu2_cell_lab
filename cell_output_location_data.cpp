@@ -12,6 +12,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_output_location_data, flamegpu::MessageNone, flameg
   FLAMEGPU->message_out.setVariable<float>("orz", FLAMEGPU->getVariable<float>("orz"));
   FLAMEGPU->message_out.setVariable<float>("k_elast", FLAMEGPU->getVariable<float>("k_elast"));
   FLAMEGPU->message_out.setVariable<float>("d_dumping", FLAMEGPU->getVariable<float>("d_dumping"));
+  FLAMEGPU->message_out.setVariable<float>("alignment", FLAMEGPU->getVariable<float>("alignment"));
 
   return flamegpu::ALIVE;
   }
