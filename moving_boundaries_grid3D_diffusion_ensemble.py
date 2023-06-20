@@ -181,9 +181,11 @@ VASCULARIZATION_POINTS_COORDS = None;  # declared here. Coords loaded from file
 INCLUDE_CELLS = True;
 INCLUDE_CELL_ORIENTATION = True;
 CELL_ORIENTATION_RATE = 2 * ECM_ORIENTATION_RATE; # [1/seconds]; TODO: check whether cell reorient themselves faster than ECM
-N_CELLS = 1;
+N_CELLS = 2;
 CELL_K_ELAST = 20.0;  # [N/units/kg]
 CELL_D_DUMPING = 4.0;  # [N*s/units/kg]
+CELL_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE / 2; # [units]
+CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 100; # [units/s];
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 # +--------------------------------------------------------------------+
@@ -299,6 +301,7 @@ ecm_ecm_interaction_file = "ecm_ecm_interaction_grid3D.cpp";
 ecm_vascularization_interaction_file = "ecm_vascularization_interaction.cpp";
 ecm_cell_interaction_file = "ecm_cell_interaction.cpp";
 cell_ecm_interaction_file = "cell_ecm_interaction.cpp";
+cell_cell_interaction_file = "cell_cell_interaction.cpp";
 ecm_boundary_concentration_conditions_file = "ecm_boundary_concentration_conditions.cpp";
 
 """
@@ -381,6 +384,8 @@ env.newPropertyUInt("INCLUDE_CELL_ORIENTATION", INCLUDE_CELL_ORIENTATION);
 env.newPropertyUInt("N_CELLS", N_CELLS);
 env.newPropertyFloat("CELL_K_ELAST", CELL_K_ELAST);
 env.newPropertyFloat("CELL_D_DUMPING", CELL_D_DUMPING);
+env.newPropertyFloat("CELL_RADIUS", CELL_RADIUS);
+env.newPropertyFloat("CELL_SPEED_REF", CELL_SPEED_REF);
 env.newPropertyFloat("CELL_ORIENTATION_RATE", CELL_ORIENTATION_RATE);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
 
@@ -499,6 +504,12 @@ if INCLUDE_CELLS:
     cell_agent.newVariableFloat("vx");
     cell_agent.newVariableFloat("vy");
     cell_agent.newVariableFloat("vz");
+    cell_agent.newVariableFloat("fx");
+    cell_agent.newVariableFloat("fy");
+    cell_agent.newVariableFloat("fz");
+    cell_agent.newVariableFloat("f_extension");
+    cell_agent.newVariableFloat("f_compression");
+    cell_agent.newVariableFloat("elastic_energy");
     cell_agent.newVariableFloat("fmag");
     cell_agent.newVariableFloat("k_elast");
     cell_agent.newVariableFloat("d_dumping");
@@ -508,8 +519,10 @@ if INCLUDE_CELLS:
     cell_agent.newVariableFloat("alignment");
     cell_agent.newRTCFunctionFile("cell_output_location_data", cell_output_location_data_file).setMessageOutput(
         "cell_location_message");
-    cell_agent.newRTCFunctionFile("cell_move", cell_move_file).setMessageInput("ecm_grid_location_message");
+    cell_agent.newRTCFunctionFile("cell_move", cell_move_file);
     cell_agent.newRTCFunctionFile("cell_ecm_interaction", cell_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
+    cell_agent.newRTCFunctionFile("cell_cell_interaction", cell_cell_interaction_file).setMessageInput(
+        "cell_location_message");
 
 """
   ECM agent
@@ -867,7 +880,7 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             current_id += 1;
             count = -1;
             # cell_orientations = getRandomVectors3D(N_CELLS)
-            cell_orientations = np.array([[0.0, 1.0, 1.0]], dtype='float')
+            cell_orientations = np.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype='float')
             cell_pos = getRandomCoords3D(N_CELLS,
                                          coord_boundary[0], coord_boundary[1],
                                          coord_boundary[2], coord_boundary[3],
@@ -881,10 +894,16 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                 # instance.setVariableFloat("x", cell_pos[i, 0]);
                 # instance.setVariableFloat("y", cell_pos[i, 1]);
                 # instance.setVariableFloat("z", cell_pos[i, 2]);
-                instance.setVariableFloat("x", 0.1);
-                instance.setVariableFloat("y", 0.1);
-                instance.setVariableFloat("z", 0.1);
+                instance.setVariableFloat("x", 0.1 + i*0.05);
+                instance.setVariableFloat("y", 0.1 + i*0.05);
+                instance.setVariableFloat("z", 0.1 + i*0.05);
                 instance.setVariableFloat("fmag", 0.0);
+                instance.setVariableFloat("fx", 0.0);
+                instance.setVariableFloat("fy", 0.0);
+                instance.setVariableFloat("fz", 0.0);
+                instance.setVariableFloat("f_extension", 0.0);
+                instance.setVariableFloat("f_compression", 0.0);
+                instance.setVariableFloat("elastic_energy", 0.0);
                 instance.setVariableFloat("k_elast", k_elast);
                 instance.setVariableFloat("d_dumping", d_dumping);
                 instance.setVariableFloat("orx", cell_orientations[count, 0]);
@@ -1446,6 +1465,8 @@ layer_count += 1
 if INCLUDE_CELLS:
     model.newLayer("L" + str(layer_count)).addAgentFunction("ECM", "ecm_cell_interaction");
     model.Layer("L" + str(layer_count)).addAgentFunction("CELL", "cell_ecm_interaction");
+    layer_count += 1
+    model.newLayer("L" + str(layer_count)).addAgentFunction("CELL", "cell_cell_interaction");
     layer_count += 1
 
 # Third set of layers: diffusion from boundaries

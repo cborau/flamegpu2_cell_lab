@@ -33,8 +33,8 @@ FLAMEGPU_DEVICE_FUNCTION float getAngleBetweenVec(const float x1, const float y1
   
   return angle; //in radians
 }
-// This function computes the ECM deformation (ECM agent is the caller, Cells are the messages) due to the action of cell agents. WARNING: not to be confused with cell_ecm_interaction, which includes cell reorientation after deformations
-FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flamegpu::MessageNone) {
+// This function computes the interaction between cells
+FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flamegpu::MessageNone) {
   // Agent properties in local register
   int id = FLAMEGPU->getVariable<int>("id");
   
@@ -48,13 +48,18 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
   float agent_vy = FLAMEGPU->getVariable<float>("vy");
   float agent_vz = FLAMEGPU->getVariable<float>("vz");
   
+  // Agent orientation
+  float agent_orx = FLAMEGPU->getVariable<float>("orx");
+  float agent_ory = FLAMEGPU->getVariable<float>("ory");
+  float agent_orz = FLAMEGPU->getVariable<float>("orz");
+  
   // Agent force
-  float agent_fx = FLAMEGPU->getVariable<float>("fx");
-  float agent_fy = FLAMEGPU->getVariable<float>("fy");
-  float agent_fz = FLAMEGPU->getVariable<float>("fz");
-  float agent_f_extension = FLAMEGPU->getVariable<float>("f_extension");
-  float agent_f_compression = FLAMEGPU->getVariable<float>("f_compression");
-  float agent_elastic_energy = FLAMEGPU->getVariable<float>("elastic_energy");
+  float agent_fx = 0.0;
+  float agent_fy = 0.0;
+  float agent_fz = 0.0;
+  float agent_f_extension = 0.0;
+  float agent_f_compression = 0.0;
+  float agent_elastic_energy = 0.0;
   float agent_fx_abs = 0.0; // if there are opposing forces (F) in the same direction, agent_fx = 0, but agent_fx_abs = 2*F
   float agent_fy_abs = 0.0;
   float agent_fz_abs = 0.0; 
@@ -101,6 +106,9 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
   // total force between agents
   float total_f = 0.0;
   
+  float agent_k_elast = FLAMEGPU->getVariable<float>("k_elast");
+  float agent_d_dumping = FLAMEGPU->getVariable<float>("d_dumping");
+  
   for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_z)) { // find cell agents within radius
     message_id = message.getVariable<int>("id");
 	message_x = message.getVariable<float>("x");
@@ -122,16 +130,21 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
     dir_z = agent_z - message_z; 
     distance = vec3Length(dir_x, dir_y, dir_z); 
 
-	if (distance < MAX_SEARCH_RADIUS_CELLS) {
+	if ((distance < MAX_SEARCH_RADIUS_CELLS) && (distance > 0.0)) {
 		// angles between agent orientation and the direction joining agents.
+		angle_agent_ori_dir = getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_x,dir_y,dir_z);
 		angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
-		cos_ori_agent = 1.0; // ECM orientation is neglected here. Only cell orientation matters. 
+		cos_ori_agent = fabsf(cosf(angle_agent_ori_dir));
 		cos_ori_message = fabsf(cosf(angle_message_ori_dir));
 		
 		if (INCLUDE_CELL_ORIENTATION != 1){
+			cos_ori_agent = 1.0;
 			cos_ori_message = 1.0;
 		}
-			
+		
+		if (cos_ori_agent < EPSILON){
+			cos_ori_agent = EPSILON;
+		}			
 
 		if (cos_ori_message < EPSILON){
 			cos_ori_message = EPSILON;
@@ -144,22 +157,23 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
 		// angles between agent & message velocity vector and the direction joining them		
 		angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
 		angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
+		
+		float k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
+
 
 		// relative speed <0 means particles are getting closer
 		relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
 		// if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive unless the ECM overlaps cell radius
 		if (distance < CELL_RADIUS){
-			float offset = (MAX_SEARCH_RADIUS_CELLS - CELL_RADIUS) * (message_k_elast); 
+			float offset = (MAX_SEARCH_RADIUS_CELLS - CELL_RADIUS) * (k_elast); 
 			total_f = ((offset / CELL_RADIUS) * distance -1 * (offset)) + message_d_dumping * relative_speed;
 		} 
 		else {
-			total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (message_k_elast) + message_d_dumping * relative_speed;
+			total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (k_elast) + message_d_dumping * relative_speed;
 		}
 		
-		total_f *= cos_ori_message;
-		// TODO: rewrite the force equation so that the ECM agent does not cross the cell radius
-		
-		//printf("ECM agent %d - cell %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
+				
+		printf("CELL %d - CELL %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
 		
 		
 		if (total_f < 0) {
@@ -173,15 +187,17 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
 			agent_fz_abs += fabsf(total_f * cos_z);
 		}
 
-		agent_elastic_energy += 0.5 * (total_f * total_f) / message_k_elast;
+		agent_elastic_energy += 0.5 * (total_f * total_f) / k_elast;
+		printf("F antes CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+
 
 		agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
 		agent_fy += -1 * total_f * cos_y;
 		agent_fz += -1 * total_f * cos_z;
+		
+		printf("F despues CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
   
     }	
-	
-	
 	
 
   }

@@ -155,7 +155,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_ecm_interaction, flamegpu::MessageArray3D, flamegpu
 	vec3CrossProd(tmpx, tmpy, tmpz, dir_fx, dir_fy, dir_fz, agent_orx, agent_ory, agent_orz);
 	vec3CrossProd(inc_dir_x, inc_dir_y, inc_dir_z, agent_orx, agent_ory, agent_orz, tmpx, tmpy, tmpz); 
 	
-	printf("cell %d -> ecm %d, cell_orientation_rate = %2.6f, delta_time = %2.6f, inc_dir_x = %2.6f, inc_dir_y = %2.6f, inc_dir_z = %2.6f, \n", id, message_id, CELL_ORIENTATION_RATE, DELTA_TIME, inc_dir_x, inc_dir_y, inc_dir_z);
+	//printf("cell %d -> ecm %d, cell_orientation_rate = %2.6f, delta_time = %2.6f, inc_dir_x = %2.6f, inc_dir_y = %2.6f, inc_dir_z = %2.6f, \n", id, message_id, CELL_ORIENTATION_RATE, DELTA_TIME, inc_dir_x, inc_dir_y, inc_dir_z);
 
 	  
 	agent_orx += inc_dir_x * CELL_ORIENTATION_RATE * DELTA_TIME;
