@@ -64,7 +64,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
   float agent_fy_abs = 0.0;
   float agent_fz_abs = 0.0; 
   
-  const float MAX_SEARCH_RADIUS_CELLS = FLAMEGPU->environment.getProperty<float>("MAX_SEARCH_RADIUS_CELLS");
+  const float MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION = FLAMEGPU->environment.getProperty<float>("MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION");
   const float CELL_RADIUS = FLAMEGPU->environment.getProperty<float>("CELL_RADIUS");
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
@@ -130,7 +130,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
     dir_z = agent_z - message_z; 
     distance = vec3Length(dir_x, dir_y, dir_z); 
 
-	if ((distance < MAX_SEARCH_RADIUS_CELLS) && (distance > 0.0)) {
+	if ((distance < MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION) && (distance > 0.0)) {
 		// angles between agent orientation and the direction joining agents.
 		angle_agent_ori_dir = getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_x,dir_y,dir_z);
 		angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
@@ -164,12 +164,12 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
 		// relative speed <0 means particles are getting closer
 		relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
 		// if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive unless the ECM overlaps cell radius
-		if (distance < CELL_RADIUS){
-			float offset = (MAX_SEARCH_RADIUS_CELLS - CELL_RADIUS) * (k_elast); 
-			total_f = ((offset / CELL_RADIUS) * distance -1 * (offset)) + message_d_dumping * relative_speed;
+		if (distance < (2 * CELL_RADIUS)){
+			float offset = (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - (2 * CELL_RADIUS)) * (k_elast); 
+			total_f = ((offset / (2 * CELL_RADIUS)) * distance -1 * (offset)) + message_d_dumping * relative_speed;
 		} 
 		else {
-			total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (k_elast) + message_d_dumping * relative_speed;
+			total_f = +1 * (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - distance) * (k_elast) + message_d_dumping * relative_speed;
 		}
 		
 				

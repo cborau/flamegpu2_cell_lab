@@ -133,7 +133,8 @@ ECM_ORIENTATION_RATE = 0.1 / (
             ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);  # [1/seconds]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS_VASCULARIZATION = ECM_ECM_EQUILIBRIUM_DISTANCE;  # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-MAX_SEARCH_RADIUS_CELLS = 2 * ECM_ECM_EQUILIBRIUM_DISTANCE;
+MAX_SEARCH_RADIUS_CELLS = 2 * ECM_ECM_EQUILIBRIUM_DISTANCE; # this radius is used to find other agents
+MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION = ECM_ECM_EQUILIBRIUM_DISTANCE; # this radius is used to check if cells interact with each other
 print("MAX_SEARCH_RADIUS for VASCULARIZATION [units]: ", MAX_SEARCH_RADIUS_VASCULARIZATION);
 print("MAX_SEARCH_RADIUS for CELLS [units]: ", MAX_SEARCH_RADIUS_CELLS);
 OSCILLATORY_SHEAR_ASSAY = False;  # if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
@@ -180,8 +181,9 @@ VASCULARIZATION_POINTS_COORDS = None;  # declared here. Coords loaded from file
 # +--------------------------------------------------------------------+
 INCLUDE_CELLS = True;
 INCLUDE_CELL_ORIENTATION = True;
-CELL_ORIENTATION_RATE = 2 * ECM_ORIENTATION_RATE; # [1/seconds]; TODO: check whether cell reorient themselves faster than ECM
-N_CELLS = 2;
+PERIODIC_BOUNDARIES_FOR_CELLS = True;
+CELL_ORIENTATION_RATE = 20 * ECM_ORIENTATION_RATE; # [1/seconds]; TODO: check whether cell reorient themselves faster than ECM
+N_CELLS = 20;
 CELL_K_ELAST = 20.0;  # [N/units/kg]
 CELL_D_DUMPING = 4.0;  # [N*s/units/kg]
 CELL_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE / 2; # [units]
@@ -238,6 +240,11 @@ if INCLUDE_DIFFUSION:
 elif INCLUDE_VASCULARIZATION:
     print('ERROR: Diffusion is deactivated. Vascularization cannot be included')
     critical_error = True
+
+if INCLUDE_CELLS:
+    if MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION < (2 * CELL_RADIUS):
+        print('MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION: {0} must be higher than 2 * CELL_RADIUS: 2 * {1}'.format(MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION, CELL_RADIUS))
+        critical_error = True
 
 if critical_error:
     quit()
@@ -381,6 +388,7 @@ env.newMacroPropertyFloat("BOUNDARY_CONC_FIXED_MULTI", N_SPECIES,
 
 # Cell properties
 env.newPropertyUInt("INCLUDE_CELL_ORIENTATION", INCLUDE_CELL_ORIENTATION);
+env.newPropertyUInt("PERIODIC_BOUNDARIES_FOR_CELLS", PERIODIC_BOUNDARIES_FOR_CELLS);
 env.newPropertyUInt("N_CELLS", N_CELLS);
 env.newPropertyFloat("CELL_K_ELAST", CELL_K_ELAST);
 env.newPropertyFloat("CELL_D_DUMPING", CELL_D_DUMPING);
@@ -388,6 +396,7 @@ env.newPropertyFloat("CELL_RADIUS", CELL_RADIUS);
 env.newPropertyFloat("CELL_SPEED_REF", CELL_SPEED_REF);
 env.newPropertyFloat("CELL_ORIENTATION_RATE", CELL_ORIENTATION_RATE);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
+env.newPropertyFloat("MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION", MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION);
 
 # Other globals
 env.newPropertyFloat("PI", 3.1415);
@@ -879,8 +888,8 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             current_id = FLAMEGPU.environment.getPropertyUInt("CURRENT_ID");
             current_id += 1;
             count = -1;
-            # cell_orientations = getRandomVectors3D(N_CELLS)
-            cell_orientations = np.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype='float')
+            cell_orientations = getRandomVectors3D(N_CELLS)
+            # cell_orientations = np.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype='float')
             cell_pos = getRandomCoords3D(N_CELLS,
                                          coord_boundary[0], coord_boundary[1],
                                          coord_boundary[2], coord_boundary[3],
@@ -891,12 +900,12 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                 count += 1;
                 instance = FLAMEGPU.agent("CELL").newAgent();
                 instance.setVariableInt("id", current_id + count);
-                # instance.setVariableFloat("x", cell_pos[i, 0]);
-                # instance.setVariableFloat("y", cell_pos[i, 1]);
-                # instance.setVariableFloat("z", cell_pos[i, 2]);
-                instance.setVariableFloat("x", 0.1 + i*0.05);
-                instance.setVariableFloat("y", 0.1 + i*0.05);
-                instance.setVariableFloat("z", 0.1 + i*0.05);
+                instance.setVariableFloat("x", cell_pos[i, 0]);
+                instance.setVariableFloat("y", cell_pos[i, 1]);
+                instance.setVariableFloat("z", cell_pos[i, 2]);
+                #instance.setVariableFloat("x", 0.1 + i*0.05);
+                #instance.setVariableFloat("y", 0.1 + i*0.05);
+                #instance.setVariableFloat("z", 0.1 + i*0.05);
                 instance.setVariableFloat("fmag", 0.0);
                 instance.setVariableFloat("fx", 0.0);
                 instance.setVariableFloat("fy", 0.0);
