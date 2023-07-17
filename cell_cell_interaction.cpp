@@ -64,8 +64,10 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
   float agent_fy_abs = 0.0;
   float agent_fz_abs = 0.0; 
   
+  // Agent radius
+  float agent_radius = FLAMEGPU->getVariable<float>("radius");
+  
   const float MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION = FLAMEGPU->environment.getProperty<float>("MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION");
-  const float CELL_RADIUS = FLAMEGPU->environment.getProperty<float>("CELL_RADIUS");
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
   int INCLUDE_CELL_ORIENTATION = FLAMEGPU->environment.getProperty<int>("INCLUDE_CELL_ORIENTATION");
@@ -82,6 +84,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
   float message_orz = 0.0;
   float message_k_elast = 0.0;
   float message_d_dumping = 0.0;
+  float message_radius = 0.0;
   
   // direction: the vector joining interacting agents
   float dir_x = 0.0; 
@@ -122,6 +125,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
 	message_orz = message.getVariable<float>("orz");
 	message_k_elast = message.getVariable<float>("k_elast");
 	message_d_dumping = message.getVariable<float>("d_dumping");
+	message_radius = message.getVariable<float>("radius");
 	
 	//printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
 	    
@@ -164,16 +168,16 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
 		// relative speed <0 means particles are getting closer
 		relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
 		// if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive unless the ECM overlaps cell radius
-		if (distance < (2 * CELL_RADIUS)){
-			float offset = (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - (2 * CELL_RADIUS)) * (k_elast); 
-			total_f = ((offset / (2 * CELL_RADIUS)) * distance -1 * (offset)) + message_d_dumping * relative_speed;
+		if (distance < (agent_radius + message_radius)){
+			float offset = (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - (agent_radius + message_radius)) * (k_elast); 
+			total_f = ((offset / (agent_radius + message_radius)) * distance -1 * (offset)) + message_d_dumping * relative_speed;
 		} 
 		else {
 			total_f = +1 * (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - distance) * (k_elast) + message_d_dumping * relative_speed;
 		}
 		
 				
-		printf("CELL %d - CELL %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
+		//printf("CELL %d - CELL %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
 		
 		
 		if (total_f < 0) {
@@ -188,14 +192,14 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
 		}
 
 		agent_elastic_energy += 0.5 * (total_f * total_f) / k_elast;
-		printf("F antes CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+		//printf("F antes CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
 
 
 		agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
 		agent_fy += -1 * total_f * cos_y;
 		agent_fz += -1 * total_f * cos_z;
 		
-		printf("F despues CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+		//printf("F despues CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
   
     }	
 	

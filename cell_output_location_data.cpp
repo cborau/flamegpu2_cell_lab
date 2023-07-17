@@ -13,6 +13,10 @@ FLAMEGPU_AGENT_FUNCTION(cell_output_location_data, flamegpu::MessageNone, flameg
   FLAMEGPU->message_out.setVariable<float>("k_elast", FLAMEGPU->getVariable<float>("k_elast"));
   FLAMEGPU->message_out.setVariable<float>("d_dumping", FLAMEGPU->getVariable<float>("d_dumping"));
   FLAMEGPU->message_out.setVariable<float>("alignment", FLAMEGPU->getVariable<float>("alignment"));
+  FLAMEGPU->message_out.setVariable<float>("radius", FLAMEGPU->getVariable<float>("radius"));
+  FLAMEGPU->message_out.setVariable<int>("cycle_phase", FLAMEGPU->getVariable<int>("cycle_phase"));
+  FLAMEGPU->message_out.setVariable<float>("clock", FLAMEGPU->getVariable<float>("clock"));
+  FLAMEGPU->message_out.setVariable<int>("completed_cycles", FLAMEGPU->getVariable<int>("completed_cycles"));
 
   return flamegpu::ALIVE;
   }

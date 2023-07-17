@@ -1,7 +1,7 @@
 # +====================================================================+
 # | Author: Carlos Borau, University of Zaragoza [cborau@unizar.es]    |
 # | Version: 1.00                                                      |
-# | Last update: 2023-05-23                                            |
+# | Last update: 2023-07-17                                            |
 # +====================================================================+
 # +--------------------------------------------------------------------+
 # | This code aims to simulate the cellular microenvironment incluing: |
@@ -82,7 +82,7 @@ PAUSE_EVERY_STEP = False;  # If True, the visualization stops every step until P
 SAVE_PICKLE = True;  # If True, dumps agent and boudary force data into a pickle file for post-processing
 SHOW_PLOTS = False;  # Show plots at the end of the simulation
 SAVE_DATA_TO_FILE = True;  # If true, agent data is exported to .vtk file every SAVE_EVERY_N_STEPS steps
-SAVE_EVERY_N_STEPS = 2;  # Affects both the .vtk files and the Dataframes storing boundary data
+SAVE_EVERY_N_STEPS = 20;  # Affects both the .vtk files and the Dataframes storing boundary data
 
 CURR_PATH = pathlib.Path().absolute();
 RES_PATH = CURR_PATH / 'result_files';
@@ -98,20 +98,20 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 # +--------------------------------------------------------------------+
-TIME_STEP = 0.01;  # seconds
-STEPS = 160;
+TIME_STEP = 0.05;  # time. WARNING: diffusionn and cell migration events might need different scales
+STEPS = 1600;
 
 # Boundray interactions and mechanical parameters
 # +--------------------------------------------------------------------+
-ECM_K_ELAST = 20.0;  # [N/units/kg]
-ECM_D_DUMPING = 4.0;  # [N*s/units/kg]
+ECM_K_ELAST = 2.0;  # [N/units/kg]
+ECM_D_DUMPING = 0.4;  # [N*s/units/kg]
 ECM_MASS = 1.0;  # [dimensionless to make K and D mass dependent]
 ECM_GEL_CONCENTRATION = 1.0;  # [dimensionless, 1.0 represents 2.5mg/ml]
 BOUNDARY_COORDS = [0.5, -0.5, 0.5, -0.5, 0.5, -0.5];  # +X,-X,+Y,-Y,+Z,-Z
 BOUNDARY_DISP_RATES = [0.0, 0.0, 0.0, 0.0, 0.0,
-                       0.0];  # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/second]
-#BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
-BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];  # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/second]
+                       0.0];  # perpendicular to each surface (+X,-X,+Y,-Y,+Z,-Z) [units/time]
+#BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/time]
+BOUNDARY_DISP_RATES_PARALLEL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];  # parallel to each surface (+X_y,+X_z,-X_y,-X_z,+Y_x,+Y_z,-Y_x,-Y_z,+Z_x,+Z_y,-Z_x,-Z_y)[units/time]
 
 POISSON_DIRS = [0, 1]  # 0: xdir, 1:ydir, 2:zdir. poisson_ratio ~= -incL(dir1)/incL(dir2); dir2 is the direction in which the load is applied
 ALLOW_BOUNDARY_ELASTIC_MOVEMENT = [0, 0, 0, 0, 0, 0];  # [bool]
@@ -130,7 +130,7 @@ ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
 INCLUDE_FIBER_ALIGNMENT = True;
 ECM_ORIENTATION_RATE = 0.1 / (
-            ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);  # [1/seconds]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces
+            ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);  # [1/time]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS_VASCULARIZATION = ECM_ECM_EQUILIBRIUM_DISTANCE;  # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
 MAX_SEARCH_RADIUS_CELLS = 2 * ECM_ECM_EQUILIBRIUM_DISTANCE; # this radius is used to find other agents
@@ -139,7 +139,7 @@ print("MAX_SEARCH_RADIUS for VASCULARIZATION [units]: ", MAX_SEARCH_RADIUS_VASCU
 print("MAX_SEARCH_RADIUS for CELLS [units]: ", MAX_SEARCH_RADIUS_CELLS);
 OSCILLATORY_SHEAR_ASSAY = False;  # if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
 OSCILLATORY_AMPLITUDE = 0.25;  # range [0-1]
-OSCILLATORY_FREQ = 0.1;  # strain oscillation frequency [s^-1]
+OSCILLATORY_FREQ = 0.1;  # strain oscillation frequency [time^-1]
 OSCILLATORY_W = 2 * math.pi * OSCILLATORY_FREQ * TIME_STEP;
 
 # Fitting parameters for the fiber strain-stiffening phenomena
@@ -182,12 +182,21 @@ VASCULARIZATION_POINTS_COORDS = None;  # declared here. Coords loaded from file
 INCLUDE_CELLS = True;
 INCLUDE_CELL_ORIENTATION = True;
 PERIODIC_BOUNDARIES_FOR_CELLS = True;
-CELL_ORIENTATION_RATE = 20 * ECM_ORIENTATION_RATE; # [1/seconds]; TODO: check whether cell reorient themselves faster than ECM
+CELL_ORIENTATION_RATE = 20 * ECM_ORIENTATION_RATE; # [1/time]; TODO: check whether cell reorient themselves faster than ECM
 N_CELLS = 20;
-CELL_K_ELAST = 20.0;  # [N/units/kg]
-CELL_D_DUMPING = 4.0;  # [N*s/units/kg]
+CELL_K_ELAST = 2.0;  # [N/units/kg]
+CELL_D_DUMPING = 0.4;  # [N*time/units/kg]
 CELL_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE / 2; # [units]
-CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 100; # [units/s];
+CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 1000; # [units/time];
+CYCLE_PHASE_G1_DURATION = 10.0; #[h]
+CYCLE_PHASE_S_DURATION = 8.0;
+CYCLE_PHASE_G2_DURATION = 4.0;
+CYCLE_PHASE_M_DURATION = 2.0;
+CYCLE_PHASE_G1_START = 0.0; #[h]
+CYCLE_PHASE_S_START = CYCLE_PHASE_G1_DURATION;
+CYCLE_PHASE_G2_START = CYCLE_PHASE_G1_DURATION + CYCLE_PHASE_S_DURATION;
+CYCLE_PHASE_M_START = CYCLE_PHASE_G1_DURATION + CYCLE_PHASE_S_DURATION + CYCLE_PHASE_G2_DURATION;
+CELL_CYCLE_DURATION = CYCLE_PHASE_G1_DURATION + CYCLE_PHASE_S_DURATION + CYCLE_PHASE_G2_DURATION + CYCLE_PHASE_M_DURATION; # typically 24h [h]
 
 # Other simulation parameters: TODO: INCLUDE PARALLEL DISP RATES
 # +--------------------------------------------------------------------+
@@ -298,6 +307,7 @@ bcorner_move_file = "bcorner_move.cpp";
 """
 cell_output_location_data_file = "cell_output_location_data.cpp";
 cell_move_file = "cell_move.cpp";
+cell_cycle_file = "cell_cycle.cpp";
 
 """
   ECM
@@ -329,9 +339,9 @@ env.newPropertyArrayUInt("ECM_AGENTS_PER_DIR", ECM_AGENTS_PER_DIR);
 
 # Number of steps to simulate
 env.newPropertyUInt("STEPS", STEPS);
-# Time increment (seconds)
+# Time increment 
 env.newPropertyFloat("DELTA_TIME", TIME_STEP);
-# Diffusion coefficient(seconds)
+# Diffusion coefficient
 env.newPropertyUInt("INCLUDE_DIFFUSION", INCLUDE_DIFFUSION);
 env.newPropertyArrayFloat("DIFFUSION_COEFF_MULTI", DIFFUSION_COEFF_MULTI);
 # Number of diffusing species
@@ -366,8 +376,8 @@ env.newPropertyArrayFloat("COORDS_BOUNDARIES", bcs);
 env.newPropertyArrayFloat("INIT_COORDS_BOUNDARIES",
                           bcs);  # this is used to compute elastic forces with respect to initial position
 
-# Boundaries displacement rate (units/second). 
-# e.g. DISP_BOUNDARY_X_POS = 0.1 means that this boundary moves 0.1 units per second towards +X
+# Boundaries displacement rate (units/time). 
+# e.g. DISP_BOUNDARY_X_POS = 0.1 means that this boundary moves 0.1 units per time towards +X
 env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES", BOUNDARY_DISP_RATES);
 env.newPropertyArrayFloat("DISP_RATES_BOUNDARIES_PARALLEL", BOUNDARY_DISP_RATES_PARALLEL);
 
@@ -397,6 +407,15 @@ env.newPropertyFloat("CELL_SPEED_REF", CELL_SPEED_REF);
 env.newPropertyFloat("CELL_ORIENTATION_RATE", CELL_ORIENTATION_RATE);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELLS", MAX_SEARCH_RADIUS_CELLS);
 env.newPropertyFloat("MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION", MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION);
+env.newPropertyFloat("CELL_CYCLE_DURATION", CELL_CYCLE_DURATION);
+env.newPropertyFloat("CYCLE_PHASE_G1_DURATION", CYCLE_PHASE_G1_DURATION);
+env.newPropertyFloat("CYCLE_PHASE_S_DURATION", CYCLE_PHASE_S_DURATION);
+env.newPropertyFloat("CYCLE_PHASE_G2_DURATION", CYCLE_PHASE_G2_DURATION);
+env.newPropertyFloat("CYCLE_PHASE_M_DURATION", CYCLE_PHASE_M_DURATION);
+env.newPropertyFloat("CYCLE_PHASE_G1_START", CYCLE_PHASE_G1_START);
+env.newPropertyFloat("CYCLE_PHASE_S_START", CYCLE_PHASE_S_START);
+env.newPropertyFloat("CYCLE_PHASE_G2_START", CYCLE_PHASE_G2_START);
+env.newPropertyFloat("CYCLE_PHASE_M_START", CYCLE_PHASE_M_START);
 
 # Other globals
 env.newPropertyFloat("PI", 3.1415);
@@ -444,6 +463,10 @@ cell_location_message.newVariableFloat("orx");
 cell_location_message.newVariableFloat("ory");
 cell_location_message.newVariableFloat("orz");
 cell_location_message.newVariableFloat("alignment");
+cell_location_message.newVariableFloat("radius");
+cell_location_message.newVariableFloat("cycle_phase");
+cell_location_message.newVariableFloat("clock");
+cell_location_message.newVariableInt("completed_cycles");
 
 ecm_grid_location_message = model.newMessageArray3D("ecm_grid_location_message");
 ecm_grid_location_message.setDimensions(ECM_AGENTS_PER_DIR[0], ECM_AGENTS_PER_DIR[1], ECM_AGENTS_PER_DIR[2]);
@@ -510,28 +533,36 @@ if INCLUDE_CELLS:
     cell_agent.newVariableFloat("x");
     cell_agent.newVariableFloat("y");
     cell_agent.newVariableFloat("z");
-    cell_agent.newVariableFloat("vx");
-    cell_agent.newVariableFloat("vy");
-    cell_agent.newVariableFloat("vz");
-    cell_agent.newVariableFloat("fx");
-    cell_agent.newVariableFloat("fy");
-    cell_agent.newVariableFloat("fz");
-    cell_agent.newVariableFloat("f_extension");
-    cell_agent.newVariableFloat("f_compression");
-    cell_agent.newVariableFloat("elastic_energy");
-    cell_agent.newVariableFloat("fmag");
+    cell_agent.newVariableFloat("vx", 0.0);
+    cell_agent.newVariableFloat("vy", 0.0);
+    cell_agent.newVariableFloat("vz", 0.0);
+    cell_agent.newVariableFloat("fx", 0.0);
+    cell_agent.newVariableFloat("fy", 0.0);
+    cell_agent.newVariableFloat("fz", 0.0);
+    cell_agent.newVariableFloat("f_extension", 0.0);
+    cell_agent.newVariableFloat("f_compression", 0.0);
+    cell_agent.newVariableFloat("elastic_energy", 0.0);
+    cell_agent.newVariableFloat("fmag", 0.0);
     cell_agent.newVariableFloat("k_elast");
     cell_agent.newVariableFloat("d_dumping");
     cell_agent.newVariableFloat("orx");
     cell_agent.newVariableFloat("ory");
     cell_agent.newVariableFloat("orz");
-    cell_agent.newVariableFloat("alignment");
+    cell_agent.newVariableFloat("alignment", 0.0);
+    cell_agent.newVariableFloat("radius", CELL_RADIUS);
+    cell_agent.newVariableInt("cycle_phase", 1); # [1:G1] [2:S] [3:G2] [4:M]
+    cell_agent.newVariableFloat("clock", 0.0); # internal clock of the cell to switch phases
+    cell_agent.newVariableInt("completed_cycles", 0);
+    
     cell_agent.newRTCFunctionFile("cell_output_location_data", cell_output_location_data_file).setMessageOutput(
         "cell_location_message");
     cell_agent.newRTCFunctionFile("cell_move", cell_move_file);
     cell_agent.newRTCFunctionFile("cell_ecm_interaction", cell_ecm_interaction_file).setMessageInput("ecm_grid_location_message");
     cell_agent.newRTCFunctionFile("cell_cell_interaction", cell_cell_interaction_file).setMessageInput(
         "cell_location_message");
+    t = cell_agent.newRTCFunctionFile("cell_cycle", cell_cycle_file);
+    t.setAgentOutput(cell_agent);
+    # t.setAllowAgentDeath(true); 
 
 """
   ECM agent
@@ -642,8 +673,8 @@ def randomVector3D():
         Coordinates of the vector.
     """
     np.random.seed()
-    phi = np.random.uniform(0, np.pi * 2)
-    costheta = np.random.uniform(-1, 1)
+    phi = np.random.uniform(0.0, np.pi * 2.0)
+    costheta = np.random.uniform(-1.0, 1.0)
     theta = np.arccos(costheta)
     x = np.sin(theta) * np.cos(phi)
     y = np.sin(theta) * np.sin(phi)
@@ -896,6 +927,7 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                                          coord_boundary[4], coord_boundary[5])
             k_elast = FLAMEGPU.environment.getPropertyFloat("CELL_K_ELAST");
             d_dumping = FLAMEGPU.environment.getPropertyFloat("CELL_D_DUMPING");
+            radius = FLAMEGPU.environment.getPropertyFloat("CELL_RADIUS");
             for i in range(N_CELLS):
                 count += 1;
                 instance = FLAMEGPU.agent("CELL").newAgent();
@@ -922,6 +954,24 @@ class initAgentPopulations(pyflamegpu.HostFunction):
                 instance.setVariableFloat("vx", 0.0);
                 instance.setVariableFloat("vy", 0.0);
                 instance.setVariableFloat("vz", 0.0);
+                instance.setVariableFloat("radius", radius);
+                cycle_phase = random.randint(1, 4); # [1:G1] [2:S] [3:G2] [4:M]
+                instance.setVariableInt("cycle_phase", cycle_phase);
+                cycle_clock = 0.0;
+                if cycle_phase == 1:
+                    cycle_clock = FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_G1_START") 
+                    + np.random.uniform(0.0, 1.0) * FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_G1_DURATION");                
+                elif cycle_phase == 2:
+                    cycle_clock = FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_S_START");
+                    + np.random.uniform(0.0, 1.0) * FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_S_DURATION");                    
+                elif cycle_phase == 3:
+                    cycle_clock = FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_G2_START");
+                    + np.random.uniform(0.0, 1.0) * FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_G2_DURATION");                    
+                elif cycle_phase == 4:
+                    cycle_clock = FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_M_START");
+                    + np.random.uniform(0.0, 1.0) * FLAMEGPU.environment.getPropertyFloat("CYCLE_PHASE_M_DURATION");                    
+                instance.setVariableFloat("clock", cycle_clock);
+                instance.setVariableInt("completed_cycles",0);
 
             FLAMEGPU.environment.setPropertyUInt("CURRENT_ID", current_id + count)
 
@@ -1085,7 +1135,7 @@ class MoveBoundaries(pyflamegpu.HostFunction):
 
 class SaveDataToFile(pyflamegpu.HostFunction):
     def __init__(self):
-        global N, N_VASCULARIZATION_POINTS, N_CELLS
+        global N, N_VASCULARIZATION_POINTS
         super().__init__()
         self.header = list()
         self.header.append("# vtk DataFile Version 3.0")
@@ -1176,6 +1226,9 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                     cell_velocity = list()
                     cell_orientation = list()
                     cell_alignment = list()
+                    cell_radius = list()
+                    cell_clock = list()
+                    cell_cycle_phase = list()
                     file_name = 'cells_t{:04d}.vtk'.format(stepCounter)
                     file_path = RES_PATH / file_name
                     cell_agent = FLAMEGPU.agent("CELL");
@@ -1186,23 +1239,41 @@ class SaveDataToFile(pyflamegpu.HostFunction):
                         orientation_ai = (
                         ai.getVariableFloat("orx"), ai.getVariableFloat("ory"), ai.getVariableFloat("orz"))
                         alignment_ai = ai.getVariableFloat("alignment")
+                        radius_ai = ai.getVariableFloat("radius")
+                        clock_ai = ai.getVariableFloat("clock")
+                        cycle_phase_ai = ai.getVariableInt("cycle_phase")
                         cell_coords.append(coords_ai)
                         cell_velocity.append(velocity_ai)
                         cell_orientation.append(orientation_ai)
                         cell_alignment.append(alignment_ai)
+                        cell_radius.append(radius_ai)
+                        cell_clock.append(clock_ai)
+                        cell_cycle_phase.append(cycle_phase_ai)
                     with open(str(file_path), 'w') as file:
                         for line in self.celldata:
                             file.write(line + '\n')
                         file.write("POINTS {} float \n".format(
-                            FLAMEGPU.environment.getPropertyUInt("N_CELLS")))  # number of vascularization agents
+                            FLAMEGPU.environment.getPropertyUInt("N_CELLS")))  # number of cell agents
                         for coords_ai in cell_coords:
                             file.write("{} {} {} \n".format(coords_ai[0], coords_ai[1], coords_ai[2]))
                         file.write("POINT_DATA {} \n".format(
-                            FLAMEGPU.environment.getPropertyUInt("N_CELLS")))  # 8 corners + number of ECM agents
+                            FLAMEGPU.environment.getPropertyUInt("N_CELLS")))  
                         file.write("SCALARS alignment float 1" + '\n')
                         file.write("LOOKUP_TABLE default" + '\n')
                         for a_ai in cell_alignment:
-                            file.write("{:.4f} \n".format(a_ai))
+                            file.write("{:.4f} \n".format(a_ai))                            
+                        file.write("SCALARS radius float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        for r_ai in cell_radius:
+                            file.write("{:.4f} \n".format(r_ai))                            
+                        file.write("SCALARS clock float 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        for c_ai in cell_clock:
+                            file.write("{:.4f} \n".format(c_ai))                        
+                        file.write("SCALARS cycle_phase int 1" + '\n')
+                        file.write("LOOKUP_TABLE default" + '\n')
+                        for ccp_ai in cell_cycle_phase:
+                            file.write("{} \n".format(ccp_ai))                       
                         file.write("VECTORS velocity float" + '\n')
                         for v_ai in cell_velocity:
                             file.write("{:.4f} {:.4f} {:.4f} \n".format(v_ai[0], v_ai[1], v_ai[2]))
@@ -1429,11 +1500,24 @@ class UpdateBoundaryConcentrationMulti(pyflamegpu.HostFunction):
                 for j in range(len(BOUNDARY_CONC_INIT_MULTI[i])):
                     BOUNDARY_CONC_INIT_MULTI[i][j] = -1.0
             resetMacroProperties(self, FLAMEGPU)
+            
+class UpdateAgentCount(pyflamegpu.HostFunction): # if cells proliferate, N_CELLS must be updated
+    def __init__(self):
+        super().__init__()
+
+    def run(self, FLAMEGPU):
+        FLAMEGPU.environment.setPropertyUInt("N_CELLS", FLAMEGPU.agent("CELL").count());
+         
+        
 
 
 if INCLUDE_DIFFUSION:
     ubcm = UpdateBoundaryConcentrationMulti()
     model.addStepFunction(ubcm)
+
+if INCLUDE_CELLS:
+    uac = UpdateAgentCount()
+    model.addStepFunction(uac)
 
 sdf = SaveDataToFile()
 model.addStepFunction(sdf)
@@ -1476,6 +1560,8 @@ if INCLUDE_CELLS:
     model.Layer("L" + str(layer_count)).addAgentFunction("CELL", "cell_ecm_interaction");
     layer_count += 1
     model.newLayer("L" + str(layer_count)).addAgentFunction("CELL", "cell_cell_interaction");
+    layer_count += 1
+    model.newLayer("L" + str(layer_count)).addAgentFunction("CELL", "cell_cycle");
     layer_count += 1
 
 # Third set of layers: diffusion from boundaries
@@ -1645,6 +1731,7 @@ if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
         circ_cell_agt.setModel(pyflamegpu.ICOSPHERE);
         circ_cell_agt.setModelScale(0.09);
         circ_cell_agt.setColor(pyflamegpu.Color("#fc03e7"));
+        #circ_cell_agt.setColor(pyflamegpu.DiscreteColor("cycle_phase", pyflamegpu.Viridis(10), pyflamegpu.WHITE, 1, 2));
         
     coord_boundary = list(env.getPropertyArrayFloat("COORDS_BOUNDARIES"))
     pen = visualisation.newLineSketch(1, 1, 1, 0.8);

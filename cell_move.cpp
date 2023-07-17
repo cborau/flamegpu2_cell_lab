@@ -35,7 +35,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   float agent_fy = FLAMEGPU->getVariable<float>("fy");
   float agent_fz = FLAMEGPU->getVariable<float>("fz");
   
-  printf("ANTES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("ANTES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
 
   //Get the new position and velocity: 
   // a(t) = f(t) / m;
@@ -51,7 +51,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   float rand_dir_factor = FLAMEGPU->random.uniform<float>(0.0,2.0); // from 0 to 2 times the ref speed in a random direction 
   // Migration in the direction of cell orientation
   float rand_prot_factor = FLAMEGPU->random.uniform<float>(0.0,2.0); // from 0 to 2 times the ref speed in the direction of cell orientation
-  printf("cell %d: rand_prot_factor: %2.3f",id,rand_prot_factor);
+  //printf("cell %d: rand_prot_factor: %2.3f",id,rand_prot_factor);
   
   agent_vx += (agent_fx / mass) * DELTA_TIME;
   agent_vx += CELL_SPEED_REF * rand_dir_factor * rand_dir_x;
@@ -68,7 +68,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   agent_vz += CELL_SPEED_REF * rand_prot_factor * agent_orz;
   agent_z += agent_vz * DELTA_TIME;
   
-  printf("DESPUES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("DESPUES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
 
   // Check boundaries
   int PERIODIC_BOUNDARIES_FOR_CELLS = FLAMEGPU->environment.getProperty<int>("PERIODIC_BOUNDARIES_FOR_CELLS");
@@ -97,7 +97,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
 	}
 	if (agent_z < COORD_BOUNDARY_Z_NEG){
 		agent_z += (COORD_BOUNDARY_Z_POS - COORD_BOUNDARY_Z_NEG);
-	}   
+	} 
   }
   else { // don't let them go out of boundaries
 	if (agent_x > COORD_BOUNDARY_X_POS){
