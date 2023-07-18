@@ -98,8 +98,8 @@ ECM_POPULATION_SIZE = ECM_AGENTS_PER_DIR[0] * ECM_AGENTS_PER_DIR[1] * ECM_AGENTS
 
 # Time simulation parameters
 # +--------------------------------------------------------------------+
-TIME_STEP = 0.05;  # time. WARNING: diffusionn and cell migration events might need different scales
-STEPS = 1600;
+TIME_STEP = 0.025;  # time. WARNING: diffusionn and cell migration events might need different scales
+STEPS = 5000;
 
 # Boundray interactions and mechanical parameters
 # +--------------------------------------------------------------------+
@@ -129,7 +129,7 @@ ECM_BOUNDARY_INTERACTION_RADIUS = 0.05;
 ECM_BOUNDARY_EQUILIBRIUM_DISTANCE = 0.0;
 
 INCLUDE_FIBER_ALIGNMENT = True;
-ECM_ORIENTATION_RATE = 0.1 / (
+ECM_ORIENTATION_RATE = 0.1 * 0.1 / (
             ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST);  # [1/time]; This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS_VASCULARIZATION = ECM_ECM_EQUILIBRIUM_DISTANCE;  # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
@@ -181,13 +181,13 @@ VASCULARIZATION_POINTS_COORDS = None;  # declared here. Coords loaded from file
 # +--------------------------------------------------------------------+
 INCLUDE_CELLS = True;
 INCLUDE_CELL_ORIENTATION = True;
-PERIODIC_BOUNDARIES_FOR_CELLS = True;
-CELL_ORIENTATION_RATE = 20 * ECM_ORIENTATION_RATE; # [1/time]; TODO: check whether cell reorient themselves faster than ECM
-N_CELLS = 20;
+PERIODIC_BOUNDARIES_FOR_CELLS = False;
+CELL_ORIENTATION_RATE = 1.0 * ECM_ORIENTATION_RATE; # [1/time]; TODO: check whether cell reorient themselves faster than ECM
+N_CELLS = 10;
 CELL_K_ELAST = 2.0;  # [N/units/kg]
 CELL_D_DUMPING = 0.4;  # [N*time/units/kg]
 CELL_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE / 2; # [units]
-CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 1000; # [units/time];
+CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 2000; # [units/time];
 CYCLE_PHASE_G1_DURATION = 10.0; #[h]
 CYCLE_PHASE_S_DURATION = 8.0;
 CYCLE_PHASE_G2_DURATION = 4.0;
@@ -661,7 +661,7 @@ def getRandomCoords3D(n, minx, maxx, miny, maxy, minz, maxz):
     np.random.seed()
     random_array = np.random.uniform(low=[minx, miny, minz], high=[maxx, maxy, maxz], size=(n, 3))
     return random_array
-
+    
 
 def randomVector3D():
     """
@@ -721,6 +721,40 @@ def getFixedVectors3D(n_vectors: int, v_dir: np.array):
     v_array = np.tile(v_dir, (n_vectors, 1))
 
     return v_array
+    
+    
+def getRandomCoordsAroundPoint(n, px, py, pz, radius):
+    """
+    Generates N random 3D coordinates within a sphere of a specific radius around a central point.
+
+    Parameters
+    ----------
+    n : int
+        The number of random coordinates to generate.
+    px : float
+        The x-coordinate of the central point.
+    py : float
+        The y-coordinate of the central point.
+    pz : float
+        The z-coordinate of the central point.
+    radius : float
+        The radius of the sphere.
+
+    Returns
+    -------
+    coords
+        A numpy array of randomly generated 3D coordinates with shape (n, 3).
+    """
+    central_point = np.array([px, py, pz])
+    rand_dirs = getRandomVectors3D(n)
+    coords = np.zeros((n, 3))
+    np.random.seed()
+    for i in range(n):
+        radius_i = np.random.uniform(0.0, 1.0) * radius        
+        coords[i, :] = central_point + np.array(rand_dirs[i, :] * radius_i, dtype='float')
+    
+
+    return coords
 
 
 """
@@ -921,10 +955,11 @@ class initAgentPopulations(pyflamegpu.HostFunction):
             count = -1;
             cell_orientations = getRandomVectors3D(N_CELLS)
             # cell_orientations = np.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype='float')
-            cell_pos = getRandomCoords3D(N_CELLS,
-                                         coord_boundary[0], coord_boundary[1],
-                                         coord_boundary[2], coord_boundary[3],
-                                         coord_boundary[4], coord_boundary[5])
+            #cell_pos = getRandomCoords3D(N_CELLS,
+             #                            coord_boundary[0], coord_boundary[1],
+             #                            coord_boundary[2], coord_boundary[3],
+             #                            coord_boundary[4], coord_boundary[5])
+            cell_pos = getRandomCoordsAroundPoint(N_CELLS, 0.0, 0.0, 0.0, 0.25)
             k_elast = FLAMEGPU.environment.getPropertyFloat("CELL_K_ELAST");
             d_dumping = FLAMEGPU.environment.getPropertyFloat("CELL_D_DUMPING");
             radius = FLAMEGPU.environment.getPropertyFloat("CELL_RADIUS");

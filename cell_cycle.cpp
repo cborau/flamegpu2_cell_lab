@@ -49,10 +49,13 @@ FLAMEGPU_AGENT_FUNCTION(cell_division, flamegpu::MessageNone, flamegpu::MessageN
 	  FLAMEGPU->setVariable<int>("cycle_phase", 3);
   }
   
-  // Increasing linear probability of division with time in M phase
+  // Increasing probability of division with time in M phase
   if (agent_clock > CYCLE_PHASE_M_START) {
 	  float time_in_phase = agent_clock - CYCLE_PHASE_M_START;
-	  float p_division = time_in_phase / CYCLE_PHASE_M_DURATION;
+	  float phase_n_steps = CYCLE_PHASE_M_DURATION / DELTA_TIME; 
+	  float p_step = 1 / phase_n_steps;
+	  float current_phase_step = time_in_phase / DELTA_TIME;
+	  float p_division = p_step / ((phase_n_steps - current_phase_step + 1) / phase_n_steps); //actual probability in current step.
 	  float p = FLAMEGPU->random.uniform<float>(0.0,1.0);
 	  FLAMEGPU->setVariable<int>("cycle_phase", 4);
 	  if (agent_clock > CELL_CYCLE_DURATION) { // this should never happen as the cell should divide first
@@ -69,7 +72,8 @@ FLAMEGPU_AGENT_FUNCTION(cell_division, flamegpu::MessageNone, flamegpu::MessageN
 		  FLAMEGPU->setVariable<float>("radius", agent_radius / 2); 
 		  agent_completed_cycles += 1;
 		  FLAMEGPU->setVariable<int>("completed_cycles", agent_completed_cycles);
-		  printf("Cell [id: %d] DIVIDES at t: %g - completed cycles: %d \n", id, agent_clock, agent_completed_cycles);
+		  printf("Cell [id: %d] DIVIDES at t: %g [time in phase: %g]- completed cycles: %d \n", id, agent_clock, time_in_phase, agent_completed_cycles);
+		  printf("Cell [id: %d] PROBS p_step: %g, phase_n_steps:%g, current_phase_step: %g, p_division: %g \n", id, p_step, phase_n_steps, current_phase_step, p_division);
 		  FLAMEGPU->setVariable<float>("clock", 0.0 + FLAMEGPU->random.uniform<float>(0.0,0.1) * CYCLE_PHASE_G1_DURATION); //add some randomness to the clock
 		  FLAMEGPU->setVariable<int>("cycle_phase", 1);	
 		  
