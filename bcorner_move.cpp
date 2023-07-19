@@ -16,54 +16,54 @@ FLAMEGPU_AGENT_FUNCTION(bcorner_move, flamegpu::MessageNone, flamegpu::MessageNo
   //printf("BCORNER %d position update -> (%2.6f, %2.6f,%2.6f, %2.6f, %2.6f, %2.6f)\n", agent_id, COORD_BOUNDARY_X_POS, COORD_BOUNDARY_X_NEG, COORD_BOUNDARY_Y_POS, COORD_BOUNDARY_Y_NEG, COORD_BOUNDARY_Z_POS, COORD_BOUNDARY_Z_NEG);
     
   switch((int)agent_id) {
-       case 1  :
-       // +x,+y,+z
-          agent_x = COORD_BOUNDARY_X_POS;
-          agent_y = COORD_BOUNDARY_Y_POS;
-          agent_z = COORD_BOUNDARY_Z_POS;
-          break; 
-       case 2  :
-          // -x,+y,+z
-          agent_x = COORD_BOUNDARY_X_NEG;
-          agent_y = COORD_BOUNDARY_Y_POS;
-          agent_z = COORD_BOUNDARY_Z_POS;
-          break; 
-       case 3  :
-          // -x,-y,+z
-          agent_x = COORD_BOUNDARY_X_NEG;
-          agent_y = COORD_BOUNDARY_Y_NEG;
-          agent_z = COORD_BOUNDARY_Z_POS;
-          break; 
-       case 4  :
-          // +x,-y,+z
-          agent_x = COORD_BOUNDARY_X_POS;
-          agent_y = COORD_BOUNDARY_Y_NEG;
-          agent_z = COORD_BOUNDARY_Z_POS;
-          break; 
-       case 5  :
-       // +x,+y,-z
-          agent_x = COORD_BOUNDARY_X_POS;
-          agent_y = COORD_BOUNDARY_Y_POS;
-          agent_z = COORD_BOUNDARY_Z_NEG;
-          break; 
-       case 6  :
-          // -x,+y,-z
-          agent_x = COORD_BOUNDARY_X_NEG;
-          agent_y = COORD_BOUNDARY_Y_POS;
-          agent_z = COORD_BOUNDARY_Z_NEG;
-          break; 
-       case 7  :
-          // -x,-y,-z
-          agent_x = COORD_BOUNDARY_X_NEG;
-          agent_y = COORD_BOUNDARY_Y_NEG;
-          agent_z = COORD_BOUNDARY_Z_NEG;
-          break; 
-       case 8  :
-          // +x,-y,-z
-          agent_x = COORD_BOUNDARY_X_POS;
-          agent_y = COORD_BOUNDARY_Y_NEG;
-          agent_z = COORD_BOUNDARY_Z_NEG;
-          break;       
+    case 1  :
+    // +x,+y,+z
+      agent_x = COORD_BOUNDARY_X_POS;
+      agent_y = COORD_BOUNDARY_Y_POS;
+      agent_z = COORD_BOUNDARY_Z_POS;
+      break; 
+    case 2  :
+    // -x,+y,+z
+      agent_x = COORD_BOUNDARY_X_NEG;
+      agent_y = COORD_BOUNDARY_Y_POS;
+      agent_z = COORD_BOUNDARY_Z_POS;
+      break; 
+    case 3  :
+    // -x,-y,+z
+      agent_x = COORD_BOUNDARY_X_NEG;
+      agent_y = COORD_BOUNDARY_Y_NEG;
+      agent_z = COORD_BOUNDARY_Z_POS;
+      break; 
+    case 4  :
+    // +x,-y,+z
+      agent_x = COORD_BOUNDARY_X_POS;
+      agent_y = COORD_BOUNDARY_Y_NEG;
+      agent_z = COORD_BOUNDARY_Z_POS;
+      break; 
+    case 5  :
+    // +x,+y,-z
+      agent_x = COORD_BOUNDARY_X_POS;
+      agent_y = COORD_BOUNDARY_Y_POS;
+      agent_z = COORD_BOUNDARY_Z_NEG;
+      break; 
+    case 6  :
+    // -x,+y,-z
+      agent_x = COORD_BOUNDARY_X_NEG;
+      agent_y = COORD_BOUNDARY_Y_POS;
+      agent_z = COORD_BOUNDARY_Z_NEG;
+      break; 
+    case 7  :
+    // -x,-y,-z
+      agent_x = COORD_BOUNDARY_X_NEG;
+      agent_y = COORD_BOUNDARY_Y_NEG;
+      agent_z = COORD_BOUNDARY_Z_NEG;
+      break; 
+    case 8  :
+    // +x,-y,-z
+      agent_x = COORD_BOUNDARY_X_POS;
+      agent_y = COORD_BOUNDARY_Y_NEG;
+      agent_z = COORD_BOUNDARY_Z_NEG;
+      break;    
   }
 
   FLAMEGPU->setVariable<float>("x",agent_x);

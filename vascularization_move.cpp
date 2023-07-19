@@ -47,27 +47,26 @@ FLAMEGPU_AGENT_FUNCTION(vascularization_move, flamegpu::MessageArray3D, flamegpu
   float message_vz = 0.0;
   
   for (const auto &message : FLAMEGPU->message_in(agent_grid_i, agent_grid_j, agent_grid_k)) { // find the closest ECM agent and move with it
-	message_id = message.getVariable<int>("id");
-	message_x = message.getVariable<float>("x");
+    message_id = message.getVariable<int>("id");
+    message_x = message.getVariable<float>("x");
     message_y = message.getVariable<float>("y");
     message_z = message.getVariable<float>("z");  
-	message_vx = message.getVariable<float>("vx");
+    message_vx = message.getVariable<float>("vx");
     message_vy = message.getVariable<float>("vy");
     message_vz = message.getVariable<float>("vz");
-	
-	dir_x = agent_x - message_x; 
+    
+    dir_x = agent_x - message_x; 
     dir_y = agent_y - message_y; 
     dir_z = agent_z - message_z; 
     distance = vec3Length(dir_x, dir_y, dir_z); 
 
-	//printf("MESSAGE ID: %d, dist: %g, pos -> (%g, %g, %g), vel -> (%g, %g, %g)\n", message_id, distance, message_x, message_y, message_z, message_vx, message_vy, message_vz);
-	
-               
-    if (distance < min_distance) {	
-		min_distance = distance;
-		agent_vx = message_vx;
-		agent_vy = message_vy;
-		agent_vz = message_vz;		
+    //printf("MESSAGE ID: %d, dist: %g, pos -> (%g, %g, %g), vel -> (%g, %g, %g)\n", message_id, distance, message_x, message_y, message_z, message_vx, message_vy, message_vz);
+
+    if (distance < min_distance) {    
+      min_distance = distance;
+      agent_vx = message_vx;
+      agent_vy = message_vy;
+      agent_vz = message_vz;        
     }  
   }
   //if (agent_vy > 0){

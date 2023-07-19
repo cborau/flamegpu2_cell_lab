@@ -5,4 +5,4 @@ FLAMEGPU_AGENT_FUNCTION(bcorner_output_location_data, flamegpu::MessageNone, fla
   FLAMEGPU->message_out.setVariable<float>("y", FLAMEGPU->getVariable<float>("y"));
   FLAMEGPU->message_out.setVariable<float>("z", FLAMEGPU->getVariable<float>("z"));
   return flamegpu::ALIVE;
-  }
+}

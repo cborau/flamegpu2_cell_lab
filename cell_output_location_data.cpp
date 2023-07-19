@@ -19,4 +19,4 @@ FLAMEGPU_AGENT_FUNCTION(cell_output_location_data, flamegpu::MessageNone, flameg
   FLAMEGPU->message_out.setVariable<int>("completed_cycles", FLAMEGPU->getVariable<int>("completed_cycles"));
 
   return flamegpu::ALIVE;
-  }
+}

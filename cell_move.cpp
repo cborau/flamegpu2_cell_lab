@@ -46,7 +46,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   float rand_dir_x = FLAMEGPU->random.uniform<float>(-1.0,1.0);
   float rand_dir_y = FLAMEGPU->random.uniform<float>(-1.0,1.0);
   float rand_dir_z = FLAMEGPU->random.uniform<float>(-1.0,1.0); 
-  float rand_dir_length = vec3Length(rand_dir_x,rand_dir_y,rand_dir_z);	  
+  float rand_dir_length = vec3Length(rand_dir_x,rand_dir_y,rand_dir_z);      
   vec3Div(rand_dir_x, rand_dir_y, rand_dir_z, rand_dir_length);
   float rand_dir_factor = FLAMEGPU->random.uniform<float>(0.0,2.0); // from 0 to 2 times the ref speed in a random direction 
   // Migration in the direction of cell orientation
@@ -80,50 +80,50 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   const float COORD_BOUNDARY_Z_NEG = FLAMEGPU->environment.getProperty<float>("COORDS_BOUNDARIES",5);
   
   if (PERIODIC_BOUNDARIES_FOR_CELLS == 1){
-	if (agent_x > COORD_BOUNDARY_X_POS){
-		agent_x -= (COORD_BOUNDARY_X_POS - COORD_BOUNDARY_X_NEG);
-	}
-	if (agent_x < COORD_BOUNDARY_X_NEG){
-		agent_x += (COORD_BOUNDARY_X_POS - COORD_BOUNDARY_X_NEG);
-	}
-	if (agent_y > COORD_BOUNDARY_Y_POS){
-		agent_y -= (COORD_BOUNDARY_Y_POS - COORD_BOUNDARY_Y_NEG);
-	}
-	if (agent_y < COORD_BOUNDARY_Y_NEG){
-		agent_y += (COORD_BOUNDARY_Y_POS - COORD_BOUNDARY_Y_NEG);
-	}
-	if (agent_z > COORD_BOUNDARY_Z_POS){
-		agent_z -= (COORD_BOUNDARY_Z_POS - COORD_BOUNDARY_Z_NEG);
-	}
-	if (agent_z < COORD_BOUNDARY_Z_NEG){
-		agent_z += (COORD_BOUNDARY_Z_POS - COORD_BOUNDARY_Z_NEG);
-	} 
+    if (agent_x > COORD_BOUNDARY_X_POS){
+      agent_x -= (COORD_BOUNDARY_X_POS - COORD_BOUNDARY_X_NEG);
+    }
+    if (agent_x < COORD_BOUNDARY_X_NEG){
+      agent_x += (COORD_BOUNDARY_X_POS - COORD_BOUNDARY_X_NEG);
+    }
+    if (agent_y > COORD_BOUNDARY_Y_POS){
+      agent_y -= (COORD_BOUNDARY_Y_POS - COORD_BOUNDARY_Y_NEG);
+    }
+    if (agent_y < COORD_BOUNDARY_Y_NEG){
+      agent_y += (COORD_BOUNDARY_Y_POS - COORD_BOUNDARY_Y_NEG);
+    }
+    if (agent_z > COORD_BOUNDARY_Z_POS){
+      agent_z -= (COORD_BOUNDARY_Z_POS - COORD_BOUNDARY_Z_NEG);
+    }
+    if (agent_z < COORD_BOUNDARY_Z_NEG){
+      agent_z += (COORD_BOUNDARY_Z_POS - COORD_BOUNDARY_Z_NEG);
+    } 
   }
   else { // don't let them go out of boundaries
-	if (agent_x > COORD_BOUNDARY_X_POS){
-		agent_x = COORD_BOUNDARY_X_POS;
-		agent_vx = 0.0;
-	}
-	if (agent_x < COORD_BOUNDARY_X_NEG){
-		agent_x = COORD_BOUNDARY_X_NEG;
-		agent_vx = 0.0;
-	}
-	if (agent_y > COORD_BOUNDARY_Y_POS){
-		agent_y = COORD_BOUNDARY_Y_POS;
-		agent_vy = 0.0;
-	}
-	if (agent_y < COORD_BOUNDARY_Y_NEG){
-		agent_y = COORD_BOUNDARY_Y_NEG;
-		agent_vy = 0.0;
-	}
-	if (agent_z > COORD_BOUNDARY_Z_POS){
-		agent_z = COORD_BOUNDARY_Z_POS;
-		agent_vz = 0.0;
-	}
-	if (agent_z < COORD_BOUNDARY_Z_NEG){
-		agent_z = COORD_BOUNDARY_Z_NEG;
-		agent_vz = 0.0;
-	}  
+    if (agent_x > COORD_BOUNDARY_X_POS){
+      agent_x = COORD_BOUNDARY_X_POS;
+      agent_vx = 0.0;
+    }
+    if (agent_x < COORD_BOUNDARY_X_NEG){
+      agent_x = COORD_BOUNDARY_X_NEG;
+      agent_vx = 0.0;
+    }
+    if (agent_y > COORD_BOUNDARY_Y_POS){
+      agent_y = COORD_BOUNDARY_Y_POS;
+      agent_vy = 0.0;
+    }
+    if (agent_y < COORD_BOUNDARY_Y_NEG){
+      agent_y = COORD_BOUNDARY_Y_NEG;
+      agent_vy = 0.0;
+    }
+    if (agent_z > COORD_BOUNDARY_Z_POS){
+      agent_z = COORD_BOUNDARY_Z_POS;
+      agent_vz = 0.0;
+    }
+    if (agent_z < COORD_BOUNDARY_Z_NEG){
+      agent_z = COORD_BOUNDARY_Z_NEG;
+      agent_vz = 0.0;
+    }  
   }
 
   //Update the agents position and velocity

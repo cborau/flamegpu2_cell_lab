@@ -47,8 +47,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_ecm_interaction, flamegpu::MessageArray3D, flamegpu
   float agent_vx = FLAMEGPU->getVariable<float>("vx");
   float agent_vy = FLAMEGPU->getVariable<float>("vy");
   float agent_vz = FLAMEGPU->getVariable<float>("vz");
-   
-  // Agen orientation
+  // Agent orientation
   float agent_orx = FLAMEGPU->getVariable<float>("orx");
   float agent_ory = FLAMEGPU->getVariable<float>("ory");
   float agent_orz = FLAMEGPU->getVariable<float>("orz");
@@ -57,8 +56,6 @@ FLAMEGPU_AGENT_FUNCTION(cell_ecm_interaction, flamegpu::MessageArray3D, flamegpu
   const float DELTA_TIME = FLAMEGPU->environment.getProperty<float>("DELTA_TIME");
   float EPSILON = FLAMEGPU->environment.getProperty<float>("EPSILON");
   int INCLUDE_CELL_ORIENTATION = FLAMEGPU->environment.getProperty<int>("INCLUDE_CELL_ORIENTATION");
-  
-  
   // Get number of agents per direction
   const int Nx = FLAMEGPU->environment.getProperty<int>("ECM_AGENTS_PER_DIR",0);
   const int Ny = FLAMEGPU->environment.getProperty<int>("ECM_AGENTS_PER_DIR",1);
@@ -106,72 +103,72 @@ FLAMEGPU_AGENT_FUNCTION(cell_ecm_interaction, flamegpu::MessageArray3D, flamegpu
   message_ory = message.getVariable<float>("ory");
   message_orz = message.getVariable<float>("orz");
 
-	
-	//printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
-	    
+
+//printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
+
   dir_x = agent_x - message_x; 
   dir_y = agent_y - message_y; 
   dir_z = agent_z - message_z; 
   distance = vec3Length(dir_x, dir_y, dir_z); 
   float strain = (MAX_SEARCH_RADIUS_CELLS - distance) / MAX_SEARCH_RADIUS_CELLS;
-		
+
   if (strain > max_strain){
-		max_strain = strain;
-		dir_max_strain_x = dir_x / distance;
-		dir_max_strain_y = dir_y / distance;
-		dir_max_strain_z = dir_z / distance;
+    max_strain = strain;
+    dir_max_strain_x = dir_x / distance;
+    dir_max_strain_y = dir_y / distance;
+    dir_max_strain_z = dir_z / distance;
   }
  
     
   if ((max_strain > EPSILON) && (INCLUDE_CELL_ORIENTATION == 1)){
-	const float CELL_ORIENTATION_RATE = FLAMEGPU->environment.getProperty<float>("CELL_ORIENTATION_RATE");
-	float inc_dir_x = 0.0;
-	float inc_dir_y = 0.0;
-	float inc_dir_z = 0.0;
-	float dir_fx = 0.0;
-	float dir_fy = 0.0;
-	float dir_fz = 0.0;
-	
-	// reorient towards ECM orientation direction 
-	dir_fx = message_orx;
-	dir_fy = message_ory;
-	dir_fz = message_orz;
-	float cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx,dir_fy,dir_fz));
-	if (cos_force_ori < 0.0){ // invert direction to find the closest angle between force and orientation directions
-	  dir_fx = -1 * dir_fx;
-	  dir_fy = -1 * dir_fy;
-	  dir_fz = -1 * dir_fz;
-	}
-	  
-	// Multiply again by strain magnitude to make orientation rate strain-dependent
-	dir_fx *= max_strain;
-	dir_fy *= max_strain;
-	dir_fz *= max_strain;
-	  
-	float tmpx = 0.0;
-	float tmpy = 0.0;
-	float tmpz = 0.0;
-	  	  
-	vec3CrossProd(tmpx, tmpy, tmpz, dir_fx, dir_fy, dir_fz, agent_orx, agent_ory, agent_orz);
-	vec3CrossProd(inc_dir_x, inc_dir_y, inc_dir_z, agent_orx, agent_ory, agent_orz, tmpx, tmpy, tmpz); 
-	
-	//printf("cell %d -> ecm %d, cell_orientation_rate = %2.6f, delta_time = %2.6f, inc_dir_x = %2.6f, inc_dir_y = %2.6f, inc_dir_z = %2.6f, \n", id, message_id, CELL_ORIENTATION_RATE, DELTA_TIME, inc_dir_x, inc_dir_y, inc_dir_z);
+    const float CELL_ORIENTATION_RATE = FLAMEGPU->environment.getProperty<float>("CELL_ORIENTATION_RATE");
+    float inc_dir_x = 0.0;
+    float inc_dir_y = 0.0;
+    float inc_dir_z = 0.0;
+    float dir_fx = 0.0;
+    float dir_fy = 0.0;
+    float dir_fz = 0.0;
+    
+    // reorient towards ECM orientation direction 
+    dir_fx = message_orx;
+    dir_fy = message_ory;
+    dir_fz = message_orz;
+    float cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx,dir_fy,dir_fz));
+    if (cos_force_ori < 0.0){ // invert direction to find the closest angle between force and orientation directions
+      dir_fx = -1 * dir_fx;
+      dir_fy = -1 * dir_fy;
+      dir_fz = -1 * dir_fz;
+    }
+      
+    // Multiply again by strain magnitude to make orientation rate strain-dependent
+    dir_fx *= max_strain;
+    dir_fy *= max_strain;
+    dir_fz *= max_strain;
+      
+    float tmpx = 0.0;
+    float tmpy = 0.0;
+    float tmpz = 0.0;
+            
+    vec3CrossProd(tmpx, tmpy, tmpz, dir_fx, dir_fy, dir_fz, agent_orx, agent_ory, agent_orz);
+    vec3CrossProd(inc_dir_x, inc_dir_y, inc_dir_z, agent_orx, agent_ory, agent_orz, tmpx, tmpy, tmpz); 
+    
+    //printf("cell %d -> ecm %d, cell_orientation_rate = %2.6f, delta_time = %2.6f, inc_dir_x = %2.6f, inc_dir_y = %2.6f, inc_dir_z = %2.6f, \n", id, message_id, CELL_ORIENTATION_RATE, DELTA_TIME, inc_dir_x, inc_dir_y, inc_dir_z);
 
-	  
-	agent_orx += inc_dir_x * CELL_ORIENTATION_RATE * DELTA_TIME;
-	agent_ory += inc_dir_y * CELL_ORIENTATION_RATE * DELTA_TIME;
-	agent_orz += inc_dir_z * CELL_ORIENTATION_RATE * DELTA_TIME;
-	  
-	float ori_length = vec3Length(agent_orx,agent_ory,agent_orz);	  
-	vec3Div(agent_orx, agent_ory, agent_orz, ori_length);
-	  	  
-	FLAMEGPU->setVariable<float>("orx", agent_orx);
-	FLAMEGPU->setVariable<float>("ory", agent_ory);
+      
+    agent_orx += inc_dir_x * CELL_ORIENTATION_RATE * DELTA_TIME;
+    agent_ory += inc_dir_y * CELL_ORIENTATION_RATE * DELTA_TIME;
+    agent_orz += inc_dir_z * CELL_ORIENTATION_RATE * DELTA_TIME;
+      
+    float ori_length = vec3Length(agent_orx,agent_ory,agent_orz);      
+    vec3Div(agent_orx, agent_ory, agent_orz, ori_length);
+            
+    FLAMEGPU->setVariable<float>("orx", agent_orx);
+    FLAMEGPU->setVariable<float>("ory", agent_ory);
     FLAMEGPU->setVariable<float>("orz", agent_orz);
-	
-	float new_cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx/max_strain,dir_fy/max_strain,dir_fz/max_strain));
-	
-	FLAMEGPU->setVariable<float>("alignment", fabsf(new_cos_force_ori));
+    
+    float new_cos_force_ori = cosf(getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_fx/max_strain,dir_fy/max_strain,dir_fz/max_strain));
+    
+    FLAMEGPU->setVariable<float>("alignment", fabsf(new_cos_force_ori));
   }
 
 

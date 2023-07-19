@@ -11,69 +11,69 @@ FLAMEGPU_HOST_DEVICE_FUNCTION void boundPosition(int id, float &x, float &y, flo
   if (cxpos == 1) {
       x = bxpos - ecm_boundary_equilibrium_distance; // redundant. Could say "do nothing"
   } else {
-      if (x > bxpos || fabsf(x - bxpos) < ecm_boundary_equilibrium_distance + EPSILON) {          
-          if (clamp_on_xpos == 1) {
-              cxpos = 1;
-              x = bxpos - ecm_boundary_equilibrium_distance;
-          }
+    if (x > bxpos || fabsf(x - bxpos) < ecm_boundary_equilibrium_distance + EPSILON) {          
+      if (clamp_on_xpos == 1) {
+        cxpos = 1;
+        x = bxpos - ecm_boundary_equilibrium_distance;
       }
+    }
   }
      
   if (cxneg == 1) {
-      x = bxneg + ecm_boundary_equilibrium_distance;
+    x = bxneg + ecm_boundary_equilibrium_distance;
   } else {
-      if (x < bxneg || fabsf(x - bxneg) < ecm_boundary_equilibrium_distance + EPSILON) {          
-          if (clamp_on_xneg == 1) {
-              cxneg = 1;
-              x = bxneg + ecm_boundary_equilibrium_distance;
-          }
+    if (x < bxneg || fabsf(x - bxneg) < ecm_boundary_equilibrium_distance + EPSILON) {          
+      if (clamp_on_xneg == 1) {
+        cxneg = 1;
+        x = bxneg + ecm_boundary_equilibrium_distance;
       }
+    }
   }
 
   if (cypos == 1) {
-      y = bypos - ecm_boundary_equilibrium_distance;
+    y = bypos - ecm_boundary_equilibrium_distance;
   } else {
-      if (y > bypos || fabsf(y - bypos) < ecm_boundary_equilibrium_distance + EPSILON) {
-          if (clamp_on_ypos == 1) {
-              cypos = 1;
-              y = bypos - ecm_boundary_equilibrium_distance;
-          }
+    if (y > bypos || fabsf(y - bypos) < ecm_boundary_equilibrium_distance + EPSILON) {
+      if (clamp_on_ypos == 1) {
+        cypos = 1;
+        y = bypos - ecm_boundary_equilibrium_distance;
       }
+    }
   }
   
   if (cyneg == 1) {
-      y = byneg + ecm_boundary_equilibrium_distance;
+    y = byneg + ecm_boundary_equilibrium_distance;
   } else {
-      if (y < byneg || fabsf(y - byneg) < ecm_boundary_equilibrium_distance + EPSILON) {     
-          if (clamp_on_yneg == 1) {
-              cyneg = 1;
-              y = byneg + ecm_boundary_equilibrium_distance;
-          }
+    if (y < byneg || fabsf(y - byneg) < ecm_boundary_equilibrium_distance + EPSILON) {     
+      if (clamp_on_yneg == 1) {
+        cyneg = 1;
+        y = byneg + ecm_boundary_equilibrium_distance;
       }
+    }
   }
 
 
   if (czpos == 1) {
-      z = bzpos - ecm_boundary_equilibrium_distance;
+    z = bzpos - ecm_boundary_equilibrium_distance;
   } else {
-      if (z > bzpos || fabsf(z - bzpos) < ecm_boundary_equilibrium_distance + EPSILON) {
-          if (clamp_on_zpos == 1) {
-              czpos = 1;
-              z = bzpos - ecm_boundary_equilibrium_distance;
-          }
+    if (z > bzpos || fabsf(z - bzpos) < ecm_boundary_equilibrium_distance + EPSILON) {
+      if (clamp_on_zpos == 1) {
+        czpos = 1;
+        z = bzpos - ecm_boundary_equilibrium_distance;
       }
+    }
   }
    
   if (czneg == 1) {
-      z = bzneg + ecm_boundary_equilibrium_distance;
+    z = bzneg + ecm_boundary_equilibrium_distance;
   }
   else {
-      if (z < bzneg || fabsf(z - bzneg) < ecm_boundary_equilibrium_distance + EPSILON) {
-          if (clamp_on_zneg == 1) {
-              czneg = 1;
-              z = bzneg + ecm_boundary_equilibrium_distance;
-          }
+    if (z < bzneg || fabsf(z - bzneg) < ecm_boundary_equilibrium_distance + EPSILON) {
+      if (clamp_on_zneg == 1) {
+        czneg = 1;
+        z = bzneg + ecm_boundary_equilibrium_distance;
       }
+    }
   }
 
   //if (id == 9 || id = 10) {
@@ -201,23 +201,23 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
   float prev_agent_z = agent_z;
    
   if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
-      agent_vx += (agent_fx / mass) * DELTA_TIME;
-      agent_x += agent_vx * DELTA_TIME;
+    agent_vx += (agent_fx / mass) * DELTA_TIME;
+    agent_x += agent_vx * DELTA_TIME;
   }
 
   if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) {
-      agent_vy += (agent_fy / mass) * DELTA_TIME;
-      agent_y += agent_vy * DELTA_TIME;
+    agent_vy += (agent_fy / mass) * DELTA_TIME;
+    agent_y += agent_vy * DELTA_TIME;
   }
   
   if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
-      agent_vz += (agent_fz / mass) * DELTA_TIME;
-      agent_z += agent_vz * DELTA_TIME;
+    agent_vz += (agent_fz / mass) * DELTA_TIME;
+    agent_z += agent_vz * DELTA_TIME;
   }
   
   //if (id == 9 || id == 10 || id == 13 || id == 14 || id == 25 || id == 26 || id == 29 || id == 30) {
   if (DEBUG_PRINTING == 1 && (id == 11 || id == 12 || id == 18)) {
-     printf("agent %d position ANTES (%2.4f, %2.4f, %2.4f) ->  boundary pos: [%2.4f, %2.4f, %2.4f, %2.4f, %2.4f, %2.4f], clamping: [%d, %d, %d, %d, %d, %d] \n",id, agent_x,agent_y,agent_z, COORD_BOUNDARY_X_POS, COORD_BOUNDARY_X_NEG, COORD_BOUNDARY_Y_POS, COORD_BOUNDARY_Y_NEG, COORD_BOUNDARY_Z_POS, COORD_BOUNDARY_Z_NEG, clamped_bx_pos, clamped_bx_neg, clamped_by_pos, clamped_by_neg, clamped_bz_pos, clamped_bz_neg);
+    printf("agent %d position ANTES (%2.4f, %2.4f, %2.4f) ->  boundary pos: [%2.4f, %2.4f, %2.4f, %2.4f, %2.4f, %2.4f], clamping: [%d, %d, %d, %d, %d, %d] \n",id, agent_x,agent_y,agent_z, COORD_BOUNDARY_X_POS, COORD_BOUNDARY_X_NEG, COORD_BOUNDARY_Y_POS, COORD_BOUNDARY_Y_NEG, COORD_BOUNDARY_Z_POS, COORD_BOUNDARY_Z_NEG, clamped_bx_pos, clamped_bx_neg, clamped_by_pos, clamped_by_neg, clamped_bz_pos, clamped_bz_neg);
   }
   
   
@@ -226,28 +226,26 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
     agent_vx = DISP_RATE_BOUNDARY_X_POS;
     f_bx_pos = agent_fx;
     if (ALLOW_AGENT_SLIDING_X_POS == 0) {
-        f_bx_pos_y = agent_fy;
-        f_bx_pos_z = agent_fz;
-        if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) { // this must be checked to avoid overwriting when agent is clamped to multiple boundaries
-            agent_y = prev_agent_y;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_POS_Y) > 0.0) {
-                agent_vy = DISP_RATE_BOUNDARY_PARALLEL_X_POS_Y;
-                agent_y += agent_vy * DELTA_TIME;                
-            }
-            else {
-                agent_vy = 0.0;
-            }
+      f_bx_pos_y = agent_fy;
+      f_bx_pos_z = agent_fz;
+      if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) { // this must be checked to avoid overwriting when agent is clamped to multiple boundaries
+        agent_y = prev_agent_y;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_POS_Y) > 0.0) {
+          agent_vy = DISP_RATE_BOUNDARY_PARALLEL_X_POS_Y;
+          agent_y += agent_vy * DELTA_TIME;                
+        } else {
+          agent_vy = 0.0;
         }
-        if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {            
-            agent_z = prev_agent_z;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_POS_Z) > 0.0) {
-                agent_vz = DISP_RATE_BOUNDARY_PARALLEL_X_POS_Z;
-                agent_z += agent_vz * DELTA_TIME;
-            }
-            else {
-                agent_vz = 0.0;
-            }
-        }
+      }
+      if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {            
+        agent_z = prev_agent_z;
+         if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_POS_Z) > 0.0) {
+           agent_vz = DISP_RATE_BOUNDARY_PARALLEL_X_POS_Z;
+           agent_z += agent_vz * DELTA_TIME;
+         } else {
+           agent_vz = 0.0;
+         }
+      }
     }
   }
   if (clamped_bx_neg == 1){
@@ -255,28 +253,28 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
     agent_vx = DISP_RATE_BOUNDARY_X_NEG;
     f_bx_neg = agent_fx;
     if (ALLOW_AGENT_SLIDING_X_NEG == 0) {
-        f_bx_neg_y = agent_fy;
-        f_bx_neg_z = agent_fz;
-        if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) { 
-            agent_y = prev_agent_y;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Y) > 0.0) {
-                agent_vy = DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Y;
-                agent_y += agent_vy * DELTA_TIME;
-            }
-            else {
-                agent_vy = 0.0;
-            }
+      f_bx_neg_y = agent_fy;
+      f_bx_neg_z = agent_fz;
+      if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) { 
+        agent_y = prev_agent_y;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Y) > 0.0) {
+          agent_vy = DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Y;
+          agent_y += agent_vy * DELTA_TIME;
         }
-        if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
-            agent_z = prev_agent_z;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Z) > 0.0) {
-                agent_vz = DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Z;
-                agent_z += agent_vz * DELTA_TIME;
-            }
-            else {
-                agent_vz = 0.0;
-            }
+        else {
+          agent_vy = 0.0;
         }
+      }
+      if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
+        agent_z = prev_agent_z;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Z) > 0.0) {
+          agent_vz = DISP_RATE_BOUNDARY_PARALLEL_X_NEG_Z;
+          agent_z += agent_vz * DELTA_TIME;
+        }
+        else {
+          agent_vz = 0.0;
+        }
+      }
     }
   }
   if (clamped_by_pos == 1){
@@ -287,24 +285,24 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
         f_by_pos_x = agent_fx;
         f_by_pos_z = agent_fz;
         if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) { 
-            agent_x = prev_agent_x;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_POS_X) > 0.0) {
-                agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Y_POS_X;
-                agent_x += agent_vx * DELTA_TIME;
-            }
-            else {
-                agent_vx = 0.0;
-            }
+          agent_x = prev_agent_x;
+          if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_POS_X) > 0.0) {
+            agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Y_POS_X;
+            agent_x += agent_vx * DELTA_TIME;
+          }
+          else {
+            agent_vx = 0.0;
+          }
         }
         if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
-            agent_z = prev_agent_z;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_POS_Z) > 0.0) {
-                agent_vz = DISP_RATE_BOUNDARY_PARALLEL_Y_POS_Z;
-                agent_z += agent_vz * DELTA_TIME;
-            }
-            else {
-                agent_vz = 0.0;
-            }
+          agent_z = prev_agent_z;
+          if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_POS_Z) > 0.0) {
+            agent_vz = DISP_RATE_BOUNDARY_PARALLEL_Y_POS_Z;
+            agent_z += agent_vz * DELTA_TIME;
+          }
+          else {
+            agent_vz = 0.0;
+          }
         }
     }
   }
@@ -313,28 +311,28 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
     agent_vy = DISP_RATE_BOUNDARY_Y_NEG;
     f_by_neg = agent_fy;
     if (ALLOW_AGENT_SLIDING_Y_NEG == 0) {
-        f_by_neg_x = agent_fx;
-        f_by_neg_z = agent_fz;
-        if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
-            agent_x = prev_agent_x;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_X) > 0.0) {
-                agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_X;
-                agent_x += agent_vx * DELTA_TIME;
-            }
-            else {
-                agent_vx = 0.0;
-            }
+      f_by_neg_x = agent_fx;
+      f_by_neg_z = agent_fz;
+      if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
+        agent_x = prev_agent_x;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_X) > 0.0) {
+          agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_X;
+          agent_x += agent_vx * DELTA_TIME;
         }
-        if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
-            agent_z = prev_agent_z;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_Z) > 0.0) {
-                agent_vz = DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_Z;
-                agent_z += agent_vz * DELTA_TIME;
-            }
-            else {
-                agent_vz = 0.0;
-            }
+        else {
+          agent_vx = 0.0;
         }
+      }
+      if ((clamped_bz_pos == 0) && (clamped_bz_neg == 0)) {
+        agent_z = prev_agent_z;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_Z) > 0.0) {
+          agent_vz = DISP_RATE_BOUNDARY_PARALLEL_Y_NEG_Z;
+          agent_z += agent_vz * DELTA_TIME;
+        }
+        else {
+           agent_vz = 0.0;
+        }
+      }
     }
   }
   if (clamped_bz_pos == 1){
@@ -342,28 +340,28 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
     agent_vz = DISP_RATE_BOUNDARY_Z_POS;
     f_bz_pos = agent_fz;
     if (ALLOW_AGENT_SLIDING_Z_POS == 0) {
-        f_bz_pos_x = agent_fx;
-        f_bz_pos_y = agent_fy;
-        if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
-            agent_x = prev_agent_x;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_POS_X) > 0.0) {
-                agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Z_POS_X;
-                agent_x += agent_vx * DELTA_TIME;
-            }
-            else {
-                agent_vx = 0.0;
-            }
+      f_bz_pos_x = agent_fx;
+      f_bz_pos_y = agent_fy;
+      if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
+        agent_x = prev_agent_x;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_POS_X) > 0.0) {
+          agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Z_POS_X;
+          agent_x += agent_vx * DELTA_TIME;
         }
-        if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) {
-            agent_y = prev_agent_y;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_POS_Y) > 0.0) {
-                agent_vy = DISP_RATE_BOUNDARY_PARALLEL_Z_POS_Y;
-                agent_y += agent_vy * DELTA_TIME;
-            }
-            else {
-                agent_vy = 0.0;
-            }
+        else {
+          agent_vx = 0.0;
         }
+      }
+      if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) {
+        agent_y = prev_agent_y;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_POS_Y) > 0.0) {
+          agent_vy = DISP_RATE_BOUNDARY_PARALLEL_Z_POS_Y;
+          agent_y += agent_vy * DELTA_TIME;
+        }
+        else {
+          agent_vy = 0.0;
+        }
+      }
     }
   }
   if (clamped_bz_neg == 1){
@@ -371,51 +369,50 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
     agent_vz = DISP_RATE_BOUNDARY_Z_NEG;
     f_bz_neg = agent_fz;
     if (ALLOW_AGENT_SLIDING_Z_NEG == 0) {
-        f_bz_neg_x = agent_fx;
-        f_bz_neg_y = agent_fy;
-        if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
-            agent_x = prev_agent_x;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_X) > 0.0) {
-                agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_X;
-                agent_x += agent_vx * DELTA_TIME;
-            }
-            else {
-                agent_vx = 0.0;
-            }
+      f_bz_neg_x = agent_fx;
+      f_bz_neg_y = agent_fy;
+      if ((clamped_bx_pos == 0) && (clamped_bx_neg == 0)) {
+        agent_x = prev_agent_x;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_X) > 0.0) {
+          agent_vx = DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_X;
+          agent_x += agent_vx * DELTA_TIME;
         }
-        if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) {
-            agent_y = prev_agent_y;
-            if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_Y) > 0.0) {
-                agent_vy = DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_Y;
-                agent_y += agent_vy * DELTA_TIME;
-            }
-            else {
-                agent_vy = 0.0;
-            }
+        else {
+         agent_vx = 0.0;
         }
+      }
+      if ((clamped_by_pos == 0) && (clamped_by_neg == 0)) {
+        agent_y = prev_agent_y;
+        if (fabsf(DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_Y) > 0.0) {
+          agent_vy = DISP_RATE_BOUNDARY_PARALLEL_Z_NEG_Y;
+          agent_y += agent_vy * DELTA_TIME;
+        }
+        else {
+          agent_vy = 0.0;
+        }
+      }
     }
   }
-
   // Add forces from elastic boundaries (therefore, not clamped)
   if (fabsf(agent_x - COORD_BOUNDARY_X_POS) > fabsf(agent_x - COORD_BOUNDARY_X_NEG)) { //if closer to xpos
-      f_bx_pos += agent_boundary_fx;// agent_boundary_fx will be 0 except for agents closer to boundaries
+    f_bx_pos += agent_boundary_fx;// agent_boundary_fx will be 0 except for agents closer to boundaries
   }
   else {
-      f_bx_neg += agent_boundary_fx;
+    f_bx_neg += agent_boundary_fx;
   }
 
   if (fabsf(agent_y - COORD_BOUNDARY_Y_POS) > fabsf(agent_y - COORD_BOUNDARY_Y_NEG)) { //if closer to ypos
-      f_by_pos += agent_boundary_fy; // agent_boundary_fy will be 0 except for agents closer to boundaries
+    f_by_pos += agent_boundary_fy; // agent_boundary_fy will be 0 except for agents closer to boundaries
   }
   else {
-      f_by_neg += agent_boundary_fy;
+    f_by_neg += agent_boundary_fy;
   }
 
   if (fabsf(agent_z - COORD_BOUNDARY_Z_POS) > fabsf(agent_z - COORD_BOUNDARY_Z_NEG)) { //if closer to zpos
-      f_bz_pos += agent_boundary_fz; // agent_boundary_fz will be 0 except for agents closer to boundaries
+    f_bz_pos += agent_boundary_fz; // agent_boundary_fz will be 0 except for agents closer to boundaries
   }
   else {
-      f_bz_neg += agent_boundary_fz;
+    f_bz_neg += agent_boundary_fz;
   }
   
   //if (id == 9 || id == 10 || id == 13 || id == 14 || id == 25 || id == 26 || id == 29 || id == 30) {
@@ -432,7 +429,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_move, flamegpu::MessageNone, flamegpu::MessageNone) 
   
   //if (id == 9 || id == 10 || id == 13 || id == 14 || id == 25 || id == 26 || id == 29 || id == 30) {
   if (DEBUG_PRINTING == 1 && (id == 11 || id == 12 || id == 18)) {
-      printf("agent %d position DESPUES (%2.4f, %2.4f, %2.4f) ->  boundary pos: [%2.4f, %2.4f, %2.4f, %2.4f, %2.4f, %2.4f], clamping: [%d, %d, %d, %d, %d, %d] \n", id, agent_x, agent_y, agent_z, COORD_BOUNDARY_X_POS, COORD_BOUNDARY_X_NEG, COORD_BOUNDARY_Y_POS, COORD_BOUNDARY_Y_NEG, COORD_BOUNDARY_Z_POS, COORD_BOUNDARY_Z_NEG, clamped_bx_pos, clamped_bx_neg, clamped_by_pos, clamped_by_neg, clamped_bz_pos, clamped_bz_neg);
+    printf("agent %d position DESPUES (%2.4f, %2.4f, %2.4f) ->  boundary pos: [%2.4f, %2.4f, %2.4f, %2.4f, %2.4f, %2.4f], clamping: [%d, %d, %d, %d, %d, %d] \n", id, agent_x, agent_y, agent_z, COORD_BOUNDARY_X_POS, COORD_BOUNDARY_X_NEG, COORD_BOUNDARY_Y_POS, COORD_BOUNDARY_Y_NEG, COORD_BOUNDARY_Z_POS, COORD_BOUNDARY_Z_NEG, clamped_bx_pos, clamped_bx_neg, clamped_by_pos, clamped_by_neg, clamped_bz_pos, clamped_bz_neg);
   }
   
   //printf("ECM move ID: %d clamps after -> (%d, %d, %d, %d, %d, %d)\n", id, clamped_bx_pos, clamped_bx_neg, clamped_by_pos, clamped_by_neg, clamped_bz_pos, clamped_bz_neg);

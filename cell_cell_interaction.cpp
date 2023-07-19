@@ -114,95 +114,95 @@ FLAMEGPU_AGENT_FUNCTION(cell_cell_interaction, flamegpu::MessageSpatial3D, flame
   
   for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_z)) { // find cell agents within radius
     message_id = message.getVariable<int>("id");
-	message_x = message.getVariable<float>("x");
+    message_x = message.getVariable<float>("x");
     message_y = message.getVariable<float>("y");
     message_z = message.getVariable<float>("z");
-	message_vx = message.getVariable<float>("vx");
-	message_vy = message.getVariable<float>("vy");
-	message_vz = message.getVariable<float>("vz");
-	message_orx = message.getVariable<float>("orx");
-	message_ory = message.getVariable<float>("ory");
-	message_orz = message.getVariable<float>("orz");
-	message_k_elast = message.getVariable<float>("k_elast");
-	message_d_dumping = message.getVariable<float>("d_dumping");
-	message_radius = message.getVariable<float>("radius");
-	
-	//printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
-	    
+    message_vx = message.getVariable<float>("vx");
+    message_vy = message.getVariable<float>("vy");
+    message_vz = message.getVariable<float>("vz");
+    message_orx = message.getVariable<float>("orx");
+    message_ory = message.getVariable<float>("ory");
+    message_orz = message.getVariable<float>("orz");
+    message_k_elast = message.getVariable<float>("k_elast");
+    message_d_dumping = message.getVariable<float>("d_dumping");
+    message_radius = message.getVariable<float>("radius");
+    
+    //printf("agent %d -> message xyz (%d) = %2.6f, %2.6f, %2.6f \n", id, message_id, message_x, message_y, message_z);
+        
     dir_x = agent_x - message_x; 
     dir_y = agent_y - message_y; 
     dir_z = agent_z - message_z; 
     distance = vec3Length(dir_x, dir_y, dir_z); 
 
-	if ((distance < MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION) && (distance > 0.0)) {
-		// angles between agent orientation and the direction joining agents.
-		angle_agent_ori_dir = getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_x,dir_y,dir_z);
-		angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
-		cos_ori_agent = fabsf(cosf(angle_agent_ori_dir));
-		cos_ori_message = fabsf(cosf(angle_message_ori_dir));
-		
-		if (INCLUDE_CELL_ORIENTATION != 1){
-			cos_ori_agent = 1.0;
-			cos_ori_message = 1.0;
-		}
-		
-		if (cos_ori_agent < EPSILON){
-			cos_ori_agent = EPSILON;
-		}			
+    if ((distance < MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION) && (distance > 0.0)) {
+      // angles between agent orientation and the direction joining agents.
+      angle_agent_ori_dir = getAngleBetweenVec(agent_orx,agent_ory,agent_orz,dir_x,dir_y,dir_z);
+      angle_message_ori_dir = getAngleBetweenVec(message_orx,message_ory,message_orz,dir_x,dir_y,dir_z);
+      cos_ori_agent = fabsf(cosf(angle_agent_ori_dir));
+      cos_ori_message = fabsf(cosf(angle_message_ori_dir));
+      
+      if (INCLUDE_CELL_ORIENTATION != 1){
+        cos_ori_agent = 1.0;
+        cos_ori_message = 1.0;
+      }
+      
+      if (cos_ori_agent < EPSILON){
+        cos_ori_agent = EPSILON;
+      }         
 
-		if (cos_ori_message < EPSILON){
-			cos_ori_message = EPSILON;
-		}	
-		
-		cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
-		cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
-		cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
-		
-		// angles between agent & message velocity vector and the direction joining them		
-		angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
-		angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
-		
-		float k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
-
-
-		// relative speed <0 means particles are getting closer
-		relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
-		// if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive unless the ECM overlaps cell radius
-		if (distance < (agent_radius + message_radius)){
-			float offset = (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - (agent_radius + message_radius)) * (k_elast); 
-			total_f = ((offset / (agent_radius + message_radius)) * distance -1 * (offset)) + message_d_dumping * relative_speed;
-		} 
-		else {
-			total_f = +1 * (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - distance) * (k_elast) + message_d_dumping * relative_speed;
-		}
-		
-				
-		//printf("CELL %d - CELL %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
-		
-		
-		if (total_f < 0) {
-			agent_f_compression += total_f;
-		}
-		else {
-			agent_f_extension += total_f;
-			// store the absolute extensions in each direction
-			agent_fx_abs += fabsf(total_f * cos_x);
-			agent_fy_abs += fabsf(total_f * cos_y);
-			agent_fz_abs += fabsf(total_f * cos_z);
-		}
-
-		agent_elastic_energy += 0.5 * (total_f * total_f) / k_elast;
-		//printf("F antes CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+      if (cos_ori_message < EPSILON){
+         cos_ori_message = EPSILON;
+      }   
+      
+      cos_x = (1.0 * dir_x + 0.0 * dir_y + 0.0 * dir_z) / distance;
+      cos_y = (0.0 * dir_x + 1.0 * dir_y + 0.0 * dir_z) / distance;
+      cos_z = (0.0 * dir_x + 0.0 * dir_y + 1.0 * dir_z) / distance;
+      
+      // angles between agent & message velocity vector and the direction joining them      
+      angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
+      angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
+      
+      float k_elast = (cos_ori_agent * agent_k_elast * cos_ori_message * message_k_elast) / ((cos_ori_agent * agent_k_elast) + (cos_ori_message * message_k_elast));
 
 
-		agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
-		agent_fy += -1 * total_f * cos_y;
-		agent_fz += -1 * total_f * cos_z;
-		
-		//printf("F despues CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+      // relative speed <0 means particles are getting closer
+      relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
+      // if total_f > 0, agents are attracted, if <0 agents are repelled. Since cells are always contracting, this should be always positive unless the ECM overlaps cell radius
+      if (distance < (agent_radius + message_radius)){
+        float offset = (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - (agent_radius + message_radius)) * (k_elast); 
+        total_f = ((offset / (agent_radius + message_radius)) * distance -1 * (offset)) + message_d_dumping * relative_speed;
+      } 
+      else {
+        total_f = +1 * (MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION - distance) * (k_elast) + message_d_dumping * relative_speed;
+      }
+      
+            
+      //printf("CELL %d - CELL %d -> distance = %2.6f, k_elast = %2.6f, total_f = %2.6f, relative_speed = %2.6f \n", id, message_id, distance, message_k_elast, total_f, relative_speed);
+      
+      
+      if (total_f < 0) {
+        agent_f_compression += total_f;
+      }
+      else {
+        agent_f_extension += total_f;
+        // store the absolute extensions in each direction
+        agent_fx_abs += fabsf(total_f * cos_x);
+        agent_fy_abs += fabsf(total_f * cos_y);
+        agent_fz_abs += fabsf(total_f * cos_z);
+      }
+
+      agent_elastic_energy += 0.5 * (total_f * total_f) / k_elast;
+      //printf("F antes CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
+
+
+      agent_fx += -1 * total_f * cos_x; // minus comes from the direction definition (agent-message)
+      agent_fy += -1 * total_f * cos_y;
+      agent_fz += -1 * total_f * cos_z;
+      
+      //printf("F despues CELL %d -> fx = %2.6f, fy = %2.6f, fz = %2.6f,\n", id, agent_fx, agent_fy, agent_fz);
   
-    }	
-	
+    }   
+   
 
   }
   
