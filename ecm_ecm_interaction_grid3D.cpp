@@ -439,10 +439,6 @@ FLAMEGPU_AGENT_FUNCTION(ecm_ecm_interaction, flamegpu::MessageArray3D, flamegpu:
         cos_ori_message = EPSILON;
       }
       
-      if (id == 99999) {
-            printf("id1: %d id2: %d cos ori [agent: %g - message: %g] positions [%g %g %g]-[%g %g %g] \n", id, message_id, cos_ori_agent,cos_ori_message,agent_x,agent_y,agent_z,message_x,message_y,message_z);            
-      }
-      
       if (INCLUDE_FIBER_ALIGNMENT != 1){
         cos_ori_agent = 1.0;
         cos_ori_message = 1.0;

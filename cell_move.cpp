@@ -23,9 +23,17 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   const float CELL_SPEED_REF = FLAMEGPU->environment.getProperty<float>("CELL_SPEED_REF");
   
   // Agent orientation
-  float agent_orx = FLAMEGPU->getVariable<float>("orx");
-  float agent_ory = FLAMEGPU->getVariable<float>("ory");
-  float agent_orz = FLAMEGPU->getVariable<float>("orz");
+  int INCLUDE_CELL_ORIENTATION = FLAMEGPU->environment.getProperty<int>("INCLUDE_CELL_ORIENTATION");
+  float agent_orx = 0.0;
+  float agent_ory = 0.0;
+  float agent_orz = 0.0;
+  
+  if (INCLUDE_CELL_ORIENTATION == 1){
+    agent_orx = FLAMEGPU->getVariable<float>("orx");
+    agent_ory = FLAMEGPU->getVariable<float>("ory");
+    agent_orz = FLAMEGPU->getVariable<float>("orz");
+  } 
+
      
   // Mass of the cell agents (current value shared with ECM. Modify rest of paramenters instead)
   float mass = 1.0;
@@ -35,7 +43,7 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   float agent_fy = FLAMEGPU->getVariable<float>("fy");
   float agent_fz = FLAMEGPU->getVariable<float>("fz");
   
-  //printf("ANTES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("ANTES -------- cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
 
   //Get the new position and velocity: 
   // a(t) = f(t) / m;
@@ -68,7 +76,11 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
   agent_vz += CELL_SPEED_REF * rand_prot_factor * agent_orz;
   agent_z += agent_vz * DELTA_TIME;
   
-  //printf("DESPUES cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("DESPUES RANDOM cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("DESPUES RANDOM cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+  //printf("RANDOM DATA    cell %d: ox: %2.3f, oy: %2.3f, oz: %2.3f rand_dir_x: %2.3f, rand_dir_y: %2.3f, rand_dir_z: %2.3f rand_dir_factor: %2.3f, rand_prot_factor: %2.3f\n",id, agent_orx,agent_ory,agent_orz, rand_dir_x,rand_dir_y,rand_dir_z, rand_dir_factor,rand_prot_factor);
+
+
 
   // Check boundaries
   int PERIODIC_BOUNDARIES_FOR_CELLS = FLAMEGPU->environment.getProperty<int>("PERIODIC_BOUNDARIES_FOR_CELLS");
@@ -125,6 +137,9 @@ FLAMEGPU_AGENT_FUNCTION(cell_move, flamegpu::MessageNone, flamegpu::MessageNone)
       agent_vz = 0.0;
     }  
   }
+  
+  //printf("BOUNDARIES     cell %d: x: %2.3f, y: %2.3f, z: %2.3f vx: %2.3f, vy: %2.3f, vz: %2.3f fx: %2.3f, fy: %2.3f, fz: %2.3f\n",id, agent_x,agent_y,agent_z, agent_vx,agent_vy,agent_vz, agent_fx,agent_fy,agent_fz);
+
 
   //Update the agents position and velocity
   FLAMEGPU->setVariable<float>("x",agent_x);

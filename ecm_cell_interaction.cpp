@@ -143,8 +143,8 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
       // angles between agent & message velocity vector and the direction joining them      
       angle_agent_v_dir = getAngleBetweenVec(agent_vx,agent_vy,agent_vz,dir_x,dir_y,dir_z);
       angle_message_v_dir = getAngleBetweenVec(message_vx,message_vy,message_vz,dir_x,dir_y,dir_z);
-	  
-	  float k_elast = (agent_k_elast * message_k_elast) / (agent_k_elast + message_k_elast); //series springs
+      
+      float k_elast = (agent_k_elast * message_k_elast) / (agent_k_elast + message_k_elast); //series springs
 
       // relative speed <0 means particles are getting closer
       relative_speed = vec3Length(agent_vx, agent_vy, agent_vz) * cosf(angle_agent_v_dir) - vec3Length(message_vx, message_vy, message_vz) * cosf(angle_message_v_dir);
@@ -153,7 +153,7 @@ FLAMEGPU_AGENT_FUNCTION(ecm_cell_interaction, flamegpu::MessageSpatial3D, flameg
         float offset = (MAX_SEARCH_RADIUS_CELLS - CELL_RADIUS) * (k_elast); 
         total_f = ((offset / CELL_RADIUS) * distance -1 * (offset)) + message_d_dumping * relative_speed;
       } 
-	  else {
+      else {
          total_f = +1 * (MAX_SEARCH_RADIUS_CELLS - distance) * (k_elast) + message_d_dumping * relative_speed;
       }
       

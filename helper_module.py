@@ -1,6 +1,6 @@
 
 class ModelParameterConfig:
-  def __init__(self, save_every_n_steps:int, n:int, time_step:float, steps:int, 
+  def __init__(self, save_every_n_steps:int, ECM_AGENTS_PER_DIR:list, time_step:float, steps:int, 
     ecm_k_elast:float, ecm_d_dumping:float, ecm_mass:float, ecm_gel_concentration:float,
     boundary_coords:list, boundary_disp_rates:list,boundary_disp_rates_parallel:list,
     poisson_dirs:list,
@@ -18,7 +18,7 @@ class ModelParameterConfig:
     include_vascularization:bool, init_vascularization_concentration_vals:list):
     
     self.SAVE_EVERY_N_STEPS = save_every_n_steps      
-    self.N = n
+    self.ECM_AGENTS_PER_DIR = list
     self.TIME_STEP = time_step
     self.STEPS = steps
     self.ECM_K_ELAST = ecm_k_elast            
