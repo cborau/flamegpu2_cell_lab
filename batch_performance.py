@@ -56,6 +56,7 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
             sim_time = float(sim_time_result.group(1))
             full_time = float(full_time_result.group(1))
             csv_out.writerow((N_CELLS, ECM_N, sim_time, full_time))
+            csv_file.flush()
             print(", sim_time %fs, full_time %fs"%(sim_time, full_time))
 
 # Cleanup
