@@ -98,7 +98,7 @@ N = <ECM_N>
 
 # Time simulation parameters
 # +--------------------------------------------------------------------+
-TIME_STEP = 0.01  # time. WARNING: diffusion and cell migration events might need different scales
+TIME_STEP = 0.0001  # time. WARNING: diffusion and cell migration events might need different scales
 STEPS = 100
 
 # Boundary interactions and mechanical parameters
@@ -1862,7 +1862,7 @@ if ENSEMBLE:
     errs = ensemble.simulate(runs_final)
 else:
     simulation.simulate()
-    print("SimTimeSecs: %f"%(simulation.getElapsedTimeSimulation))
+    print("SimTimeSecs: %f"%(simulation.getElapsedTimeSimulation()))
 
 """
   Export Pop
