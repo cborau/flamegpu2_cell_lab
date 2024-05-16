@@ -43,7 +43,7 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
     ECM_N_sweep = range(10,101,10)
     for N_CELLS in N_CELLS_sweep:
         for ECM_N in ECM_N_sweep:
-            print("N_CELLS %d, ECM_N %d"%(N_CELLS, ECM_N_sweep), end='')
+            print("N_CELLS %d, ECM_N %d"%(N_CELLS, ECM_N), end='')
             # Perform replacement of the two variables
             # @note These replacements are unstable if the template changes
             output = run_model(N_CELLS, ECM_N)
