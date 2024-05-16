@@ -49,5 +49,5 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
             csv_out.writerow((N_CELLS, ECM_N, sim_time, full_time))
 
 # Cleanup
-if os.path.exists(temp_model_path)
+if os.path.exists(temp_model_path):
     os.remove(temp_model_path)
