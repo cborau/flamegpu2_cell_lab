@@ -31,8 +31,8 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
             # Perform replacement of the two variables
             # @note These replacements are unstable if the template changes
             model_src = model_template.replace("<N_CELLS>", "%d"%(ECM_N), 1).replace("<ECM_N>", "%d"%(ECM_N), 1)
-            with open(temp_model_path, "w") as model_file:        
-                f.write(model_src)
+            with open(temp_model_path, "w") as model_file:
+                model_file.write(model_src)
             # Execute (might require python3)
             try:
                 output = check_output(["python", temp_model_path], stderr=STDOUT).decode()
