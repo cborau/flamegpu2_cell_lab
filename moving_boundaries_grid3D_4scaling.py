@@ -1862,6 +1862,7 @@ if ENSEMBLE:
     errs = ensemble.simulate(runs_final)
 else:
     simulation.simulate()
+    print("SimTimeSecs: %f"%(simulation.getElapsedTimeSimulation))
 
 """
   Export Pop
@@ -1872,7 +1873,7 @@ else:
 if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
     visualisation.join()
 
-print("--- EXECUTION TIME: %s seconds ---" % (time.time() - start_time))
+print("FullTimeSecs: %f" % (time.time() - start_time))
 
 incL_dir1 = (BPOS_OVER_TIME.iloc[:, POISSON_DIRS[0] * 2] - BPOS_OVER_TIME.iloc[:, POISSON_DIRS[0] * 2 + 1]) - (
         BPOS_OVER_TIME.iloc[0, POISSON_DIRS[0] * 2] - BPOS_OVER_TIME.iloc[0, POISSON_DIRS[0] * 2 + 1])
