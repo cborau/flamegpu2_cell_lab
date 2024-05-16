@@ -43,6 +43,7 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
     ECM_N_sweep = range(10,101,10)
     for N_CELLS in N_CELLS_sweep:
         for ECM_N in ECM_N_sweep:
+            print("N_CELLS %d, ECM_N %d"%(N_CELLS, ECM_N_sweep), end='')
             # Perform replacement of the two variables
             # @note These replacements are unstable if the template changes
             output = run_model(N_CELLS, ECM_N)
@@ -55,6 +56,7 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
             sim_time = float(sim_time_result.group(1))
             full_time = float(full_time_result.group(1))
             csv_out.writerow((N_CELLS, ECM_N, sim_time, full_time))
+            print(", sim_time %fs, full_time %fs"%(sim_time, full_time))
 
 # Cleanup
 if os.path.exists(temp_model_path):
