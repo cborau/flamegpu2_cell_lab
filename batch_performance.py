@@ -18,6 +18,21 @@ if model_template.count("<ECM_N>") != 1:
 sim_time_re = re.compile(r"SimTimeSecs: ([0-9.]+)")
 full_time_re = re.compile(r"FullTimeSecs: ([0-9.]+)")
 
+def run_model(N_CELLS, ECM_N):
+    # Perform replacement of the two variables
+    # @note These replacements are unstable if the template changes
+    model_src = model_template.replace("<N_CELLS>", "%d"%(ECM_N), 1).replace("<ECM_N>", "%d"%(ECM_N), 1)
+    with open(temp_model_path, "w") as model_file:
+        model_file.write(model_src)
+    # Execute (might require python3)
+    try:
+        return check_output(["python", temp_model_path], stderr=STDOUT).decode()
+    except CalledProcessError as e:
+        return e.output.decode()
+
+# Perform an empty run first, to force RTC to compile
+run_model(100, 10)
+
 # Begin output CSV
 with open('performance_results.csv', 'w', newline='') as csv_file:
     csv_out = csv.writer(csv_file, delimiter=',')
@@ -30,14 +45,7 @@ with open('performance_results.csv', 'w', newline='') as csv_file:
         for ECM_N in ECM_N_sweep:
             # Perform replacement of the two variables
             # @note These replacements are unstable if the template changes
-            model_src = model_template.replace("<N_CELLS>", "%d"%(ECM_N), 1).replace("<ECM_N>", "%d"%(ECM_N), 1)
-            with open(temp_model_path, "w") as model_file:
-                model_file.write(model_src)
-            # Execute (might require python3)
-            try:
-                output = check_output(["python", temp_model_path], stderr=STDOUT).decode()
-            except CalledProcessError as e:
-                output = e.output.decode()
+            output = run_model(N_CELLS, ECM_N)
             # Collect/validate performance results
             sim_time_result = re.search(sim_time_re, output)
             full_time_result = re.search(full_time_re, output)
