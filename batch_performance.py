@@ -1,4 +1,4 @@
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError, STDOUT
 import os, re, csv
 # Path to the model to be orchestrated
 template_path = "moving_boundaries_grid3D_4scaling.py"
