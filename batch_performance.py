@@ -21,7 +21,7 @@ full_time_re = re.compile(r"FullTimeSecs: ([0-9.]+)")
 def run_model(N_CELLS, ECM_N):
     # Perform replacement of the two variables
     # @note These replacements are unstable if the template changes
-    model_src = model_template.replace("<N_CELLS>", "%d"%(ECM_N), 1).replace("<ECM_N>", "%d"%(ECM_N), 1)
+    model_src = model_template.replace("<N_CELLS>", "%d"%(N_CELLS), 1).replace("<ECM_N>", "%d"%(ECM_N), 1)
     with open(temp_model_path, "w") as model_file:
         model_file.write(model_src)
     # Execute (might require python3)
