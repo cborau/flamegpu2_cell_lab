@@ -1863,6 +1863,11 @@ if ENSEMBLE:
 else:
     simulation.simulate()
     print("SimTimeSecs: %f"%(simulation.getElapsedTimeSimulation()))
+    print("InitTimeSecs: %f"%(simulation.getElapsedTimeInitFunctions()))
+    print("RTCTimeSecs: %f"%(simulation.getElapsedTimeRTCInitialisation()))
+    print("ExitTimeSecs: %f"%(simulation.getElapsedTimeExitFunctions()))
+    stime = simulation.getElapsedTimeSteps()
+    print("StepTimeAvgSecs: %f"%(np.mean(stime)))
 
 """
   Export Pop
