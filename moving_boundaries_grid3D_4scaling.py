@@ -165,8 +165,8 @@ ECM_ORIENTATION_RATE = 0.1 * 0.1 / (
             ECM_ECM_EQUILIBRIUM_DISTANCE * ECM_K_ELAST)  # [1/time] This is adjusted to aprox 1.0/max_force so that the reorientation is not too slow with small forces
 print("ECM_ORIENTATION_RATE [1/s]: ", ECM_ORIENTATION_RATE)
 MAX_SEARCH_RADIUS_VASCULARIZATION = ECM_ECM_EQUILIBRIUM_DISTANCE  # this strongly affects the number of bins and therefore the memory allocated for simulations (more bins -> more memory -> faster (in theory))
-MAX_SEARCH_RADIUS_CELLS = 2 * ECM_ECM_EQUILIBRIUM_DISTANCE # this radius is used to find other agents
-MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION = ECM_ECM_EQUILIBRIUM_DISTANCE # this radius is used to check if cells interact with each other
+MAX_SEARCH_RADIUS_CELLS = 0.05 # this radius is used to find other agents
+MAX_SEARCH_RADIUS_CELL_CELL_INTERACTION = 0.05 # this radius is used to check if cells interact with each other
 print("MAX_SEARCH_RADIUS for VASCULARIZATION [units]: ", MAX_SEARCH_RADIUS_VASCULARIZATION)
 print("MAX_SEARCH_RADIUS for CELLS [units]: ", MAX_SEARCH_RADIUS_CELLS)
 OSCILLATORY_SHEAR_ASSAY = False  # if true, BOUNDARY_DISP_RATES_PARALLEL options are overrun but used to make the boundaries oscillate in their corresponding planes following a sin() function
@@ -220,7 +220,7 @@ CELL_ORIENTATION_RATE = 1.0 * ECM_ORIENTATION_RATE # [1/time] TODO: check whethe
 N_CELLS = <N_CELLS>
 CELL_K_ELAST = 2.0  # [N/units/kg]
 CELL_D_DUMPING = 0.4  # [N*time/units/kg]
-CELL_RADIUS = ECM_ECM_EQUILIBRIUM_DISTANCE / 2 # [units]
+CELL_RADIUS = 0.01 # [units]
 CELL_SPEED_REF = ECM_ECM_EQUILIBRIUM_DISTANCE / TIME_STEP / 10.0 # [units/time]
 CYCLE_PHASE_G1_DURATION = 10.0 #[h]
 CYCLE_PHASE_S_DURATION = 8.0
